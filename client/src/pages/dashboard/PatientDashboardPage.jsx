@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import Card from "../../components/common/Card";
+import { useLanguage } from "../../context/LanguageContext";
 import useRoleDashboardData from "../../hooks/useRoleDashboardData";
 import { createEntityService } from "../../services/entityService";
 
@@ -7,6 +8,15 @@ const appointmentService = createEntityService("appointments");
 const billingService = createEntityService("billing");
 
 function PatientDashboardPage() {
+  const { t, formatDate } = useLanguage();
+  const getStatusLabel = (status) =>
+    ({
+      Scheduled: t("option.scheduled"),
+      "In-Progress": t("option.inProgress"),
+      Completed: t("option.completed"),
+      Cancelled: t("option.cancelled"),
+      Rescheduled: t("option.rescheduled"),
+    }[status] || status);
   const loadDashboard = useCallback(async () => {
     const [appointments, billing] = await Promise.all([
       appointmentService.list({ limit: 100 }),
@@ -33,20 +43,20 @@ function PatientDashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm uppercase tracking-[0.25em] text-brand-600">Patient Dashboard</p>
-        <h1 className="mt-2 text-3xl font-semibold text-slate-900">Care journey at a glance</h1>
+        <p className="text-sm uppercase tracking-[0.25em] text-brand-600">{t("dashboard.patientLabel")}</p>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-900">{t("dashboard.patientTitle")}</h1>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card><p className="text-sm text-slate-500">Upcoming appointments</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.upcoming}</p></Card>
-        <Card><p className="text-sm text-slate-500">Total appointments</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.totalAppointments}</p></Card>
-        <Card><p className="text-sm text-slate-500">Outstanding bills</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.outstanding}</p></Card>
-        <Card><p className="text-sm text-slate-500">Paid bills</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.paid}</p></Card>
+        <Card><p className="text-sm text-slate-500">{t("stats.upcomingAppointments")}</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.upcoming}</p></Card>
+        <Card><p className="text-sm text-slate-500">{t("stats.totalAppointments")}</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.totalAppointments}</p></Card>
+        <Card><p className="text-sm text-slate-500">{t("stats.outstandingBills")}</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.outstanding}</p></Card>
+        <Card><p className="text-sm text-slate-500">{t("stats.paidBills")}</p><p className="mt-3 text-3xl font-semibold">{isLoading ? "-" : data.paid}</p></Card>
       </div>
-      <Card title="Latest appointment" subtitle="Pulled from live appointment data">
+      <Card title={t("patient.latestAppointmentTitle")} subtitle={t("patient.latestAppointmentSubtitle")}>
         <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
           {data.latestAppointment
-            ? `${new Date(data.latestAppointment.appointmentDate).toLocaleDateString()} at ${data.latestAppointment.appointmentTime} - ${data.latestAppointment.status}`
-            : "No appointments available yet."}
+            ? `${formatDate(data.latestAppointment.appointmentDate)} ${t("common.at")} ${data.latestAppointment.appointmentTime} - ${getStatusLabel(data.latestAppointment.status)}`
+            : t("common.noAppointments")}
         </div>
       </Card>
     </div>

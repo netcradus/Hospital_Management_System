@@ -1,4 +1,8 @@
+import { useLanguage } from "../../context/LanguageContext";
+
 function DataTable({ columns, rows }) {
+  const { t } = useLanguage();
+
   return (
     <div className="overflow-hidden rounded-[24px] border border-mist-200 bg-white/95">
       <div className="space-y-3 p-3 md:hidden">
@@ -24,7 +28,7 @@ function DataTable({ columns, rows }) {
           ))
         ) : (
           <div className="rounded-[20px] border border-dashed border-mist-200 bg-mist-50 px-4 py-8 text-center text-sm text-slate-500">
-            No records yet.
+            {t("table.noRecords")}
           </div>
         )}
       </div>
@@ -54,7 +58,7 @@ function DataTable({ columns, rows }) {
             ) : (
               <tr>
                 <td colSpan={columns.length} className="px-5 py-10 text-center text-sm text-slate-500">
-                  No records yet.
+                  {t("table.noRecords")}
                 </td>
               </tr>
             )}

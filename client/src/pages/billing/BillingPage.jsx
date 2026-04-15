@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import CrudManagerPage from "../../components/common/CrudManagerPage";
+import { useLanguage } from "../../context/LanguageContext";
 import useCrudResource from "../../hooks/useCrudResource";
 import { createEntityService } from "../../services/entityService";
 
@@ -23,10 +24,11 @@ const defaultValues = {
 };
 
 function BillingPage() {
-  const { items, isLoading, isSubmitting, createItem, updateItem, deleteItem } = useCrudResource(billingService, "Billing");
-  const [patientOptions, setPatientOptions] = useState([{ value: "", label: "Select patient" }]);
-  const [doctorOptions, setDoctorOptions] = useState([{ value: "", label: "Select doctor" }]);
-  const [appointmentOptions, setAppointmentOptions] = useState([{ value: "", label: "Select appointment" }]);
+  const { t, formatCurrency } = useLanguage();
+  const { items, isLoading, isSubmitting, createItem, updateItem, deleteItem } = useCrudResource(billingService, t("resource.billing"));
+  const [patientOptions, setPatientOptions] = useState([{ value: "", label: t("billing.selectPatient") }]);
+  const [doctorOptions, setDoctorOptions] = useState([{ value: "", label: t("billing.selectDoctor") }]);
+  const [appointmentOptions, setAppointmentOptions] = useState([{ value: "", label: t("billing.selectAppointment") }]);
 
   useEffect(() => {
     const loadDependencies = async () => {
@@ -37,31 +39,31 @@ function BillingPage() {
       ]);
 
       setPatientOptions([
-        { value: "", label: "Select patient" },
+        { value: "", label: t("billing.selectPatient") },
         ...patients.items.map((patient) => ({ value: patient._id, label: `${patient.firstName} ${patient.lastName}` })),
       ]);
       setDoctorOptions([
-        { value: "", label: "Select doctor" },
+        { value: "", label: t("billing.selectDoctor") },
         ...doctors.items.map((doctor) => ({ value: doctor._id, label: `${doctor.firstName} ${doctor.lastName}` })),
       ]);
       setAppointmentOptions([
-        { value: "", label: "Select appointment" },
+        { value: "", label: t("billing.selectAppointment") },
         ...appointments.items.map((appointment) => ({
           value: appointment._id,
-          label: `${appointment.patientId?.firstName || "Patient"} - ${appointment.appointmentTime || "Time"}`,
+          label: `${appointment.patientId?.firstName || t("resource.patient")} - ${appointment.appointmentTime || t("field.time")}`,
         })),
       ]);
     };
 
     loadDependencies();
-  }, []);
+  }, [t]);
 
   return (
     <CrudManagerPage
-      title="Billing and invoices"
-      subtitle="Track live billing records, payments, and invoice totals from the backend."
-      description="Real-time financial records for appointments and services."
-      resourceLabel="Billing"
+      title={t("billing.title")}
+      subtitle={t("billing.subtitle")}
+      description={t("billing.description")}
+      resourceLabel={t("resource.billing")}
       items={items}
       isLoading={isLoading}
       isSubmitting={isSubmitting}
@@ -93,24 +95,42 @@ function BillingPage() {
         appointmentId: item.appointmentId?._id || "",
       })}
       fields={[
-        { name: "patientId", label: "Patient", type: "select", options: patientOptions, rules: { required: "Patient is required" } },
-        { name: "doctorId", label: "Doctor", type: "select", options: doctorOptions },
-        { name: "appointmentId", label: "Appointment", type: "select", options: appointmentOptions },
-        { name: "serviceDescription", label: "Service description", type: "textarea", rules: { required: "Service description is required" } },
-        { name: "amount", label: "Amount", type: "number", step: "0.01", rules: { required: "Amount is required" } },
-        { name: "tax", label: "Tax", type: "number", step: "0.01" },
-        { name: "discount", label: "Discount", type: "number", step: "0.01" },
-        { name: "totalAmount", label: "Total amount", type: "number", step: "0.01", rules: { required: "Total amount is required" } },
-        { name: "paymentStatus", label: "Payment status", type: "select", options: [{ value: "Pending", label: "Pending" }, { value: "Paid", label: "Paid" }, { value: "Partially Paid", label: "Partially Paid" }] },
-        { name: "paymentMethod", label: "Payment method" },
-        { name: "invoiceNumber", label: "Invoice number" },
+        { name: "patientId", label: t("resource.patient"), type: "select", options: patientOptions, rules: { required: t("appointments.patientRequired") } },
+        { name: "doctorId", label: t("resource.doctor"), type: "select", options: doctorOptions },
+        { name: "appointmentId", label: t("resource.appointment"), type: "select", options: appointmentOptions },
+        { name: "serviceDescription", label: t("billing.serviceDescription"), type: "textarea", rules: { required: t("billing.serviceDescriptionRequired") } },
+        { name: "amount", label: t("billing.amount"), type: "number", step: "0.01", rules: { required: t("billing.amountRequired") } },
+        { name: "tax", label: t("billing.tax"), type: "number", step: "0.01" },
+        { name: "discount", label: t("billing.discount"), type: "number", step: "0.01" },
+        { name: "totalAmount", label: t("billing.totalAmount"), type: "number", step: "0.01", rules: { required: t("billing.totalAmountRequired") } },
+        {
+          name: "paymentStatus",
+          label: t("billing.paymentStatus"),
+          type: "select",
+          options: [
+            { value: "Pending", label: t("option.pending") },
+            { value: "Paid", label: t("option.paid") },
+            { value: "Partially Paid", label: t("option.partiallyPaid") },
+          ],
+        },
+        { name: "paymentMethod", label: t("billing.paymentMethod") },
+        { name: "invoiceNumber", label: t("billing.invoiceNumber") },
       ]}
       columns={[
-        { key: "invoiceNumber", label: "Invoice" },
-        { key: "patientId", label: "Patient", render: (value) => (value ? `${value.firstName} ${value.lastName}` : "-") },
-        { key: "serviceDescription", label: "Service" },
-        { key: "totalAmount", label: "Total", render: (value) => `₹${Number(value || 0).toFixed(2)}` },
-        { key: "paymentStatus", label: "Status" },
+        { key: "invoiceNumber", label: t("field.invoice") },
+        { key: "patientId", label: t("resource.patient"), render: (value) => (value ? `${value.firstName} ${value.lastName}` : "-") },
+        { key: "serviceDescription", label: t("field.service") },
+        { key: "totalAmount", label: t("field.total"), render: (value) => formatCurrency(value || 0) },
+        {
+          key: "paymentStatus",
+          label: t("patients.status"),
+          render: (value) =>
+            ({
+              Pending: t("option.pending"),
+              Paid: t("option.paid"),
+              "Partially Paid": t("option.partiallyPaid"),
+            }[value] || value),
+        },
       ]}
     />
   );

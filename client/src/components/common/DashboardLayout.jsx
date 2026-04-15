@@ -12,40 +12,46 @@ import {
   HiOutlineUsers,
 } from "react-icons/hi2";
 import useAuth from "../../hooks/useAuth";
+import { useLanguage } from "../../context/LanguageContext";
 import { getDashboardPath } from "../../utils/roleRoutes";
-
-const navByRole = {
-  admin: [
-    { to: "/admin/dashboard", label: "Dashboard", icon: HiOutlineHome },
-    { to: "/admin/patients", label: "Patients", icon: HiOutlineUsers },
-    { to: "/admin/doctors", label: "Doctors", icon: HiOutlineUserGroup },
-    { to: "/admin/appointments", label: "Appointments", icon: HiOutlineCalendarDays },
-    { to: "/admin/billing", label: "Billing", icon: HiOutlineCreditCard },
-    { to: "/admin/departments", label: "Departments", icon: HiOutlineBuildingOffice2 },
-    { to: "/admin/staff", label: "Staff", icon: HiOutlineUsers },
-  ],
-  doctor: [
-    { to: "/doctor/dashboard", label: "Dashboard", icon: HiOutlineHome },
-    { to: "/doctor/appointments", label: "Appointments", icon: HiOutlineCalendarDays },
-    { to: "/doctor/patients", label: "Patients", icon: HiOutlineUsers },
-  ],
-  patient: [
-    { to: "/patient/dashboard", label: "Dashboard", icon: HiOutlineHome },
-    { to: "/patient/appointments", label: "My Appointments", icon: HiOutlineCalendarDays },
-    { to: "/patient/billing", label: "Billing", icon: HiOutlineCreditCard },
-  ],
-  staff: [
-    { to: "/staff/dashboard", label: "Dashboard", icon: HiOutlineHome },
-    { to: "/staff/patients", label: "Patients", icon: HiOutlineUsers },
-    { to: "/staff/appointments", label: "Appointments", icon: HiOutlineCalendarDays },
-    { to: "/staff/billing", label: "Billing", icon: HiOutlineCreditCard },
-  ],
-};
+import LanguageSwitcher from "./LanguageSwitcher";
 
 function DashboardLayout() {
   const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const navItems = useMemo(() => navByRole[user?.role] || [], [user?.role]);
+  const navByRole = useMemo(
+    () => ({
+      admin: [
+        { to: "/admin/dashboard", label: t("nav.dashboard"), icon: HiOutlineHome },
+        { to: "/admin/patients", label: t("nav.patients"), icon: HiOutlineUsers },
+        { to: "/admin/doctors", label: t("nav.doctors"), icon: HiOutlineUserGroup },
+        { to: "/admin/appointments", label: t("nav.appointments"), icon: HiOutlineCalendarDays },
+        { to: "/admin/billing", label: t("nav.billing"), icon: HiOutlineCreditCard },
+        { to: "/admin/departments", label: t("nav.departments"), icon: HiOutlineBuildingOffice2 },
+        { to: "/admin/staff", label: t("nav.staff"), icon: HiOutlineUsers },
+      ],
+      doctor: [
+        { to: "/doctor/dashboard", label: t("nav.dashboard"), icon: HiOutlineHome },
+        { to: "/doctor/appointments", label: t("nav.appointments"), icon: HiOutlineCalendarDays },
+        { to: "/doctor/patients", label: t("nav.patients"), icon: HiOutlineUsers },
+      ],
+      patient: [
+        { to: "/patient/dashboard", label: t("nav.dashboard"), icon: HiOutlineHome },
+        { to: "/patient/appointments", label: t("nav.appointments"), icon: HiOutlineCalendarDays },
+        { to: "/patient/billing", label: t("nav.billing"), icon: HiOutlineCreditCard },
+      ],
+      staff: [
+        { to: "/staff/dashboard", label: t("nav.dashboard"), icon: HiOutlineHome },
+        { to: "/staff/patients", label: t("nav.patients"), icon: HiOutlineUsers },
+        { to: "/staff/appointments", label: t("nav.appointments"), icon: HiOutlineCalendarDays },
+        { to: "/staff/billing", label: t("nav.billing"), icon: HiOutlineCreditCard },
+      ],
+    }),
+    [t]
+  );
+  const navItems = useMemo(() => navByRole[user?.role] || [], [navByRole, user?.role]);
+  const roleLabel = t(`role.${user?.role || "admin"}`);
 
   return (
     <div className="min-h-screen bg-shell-glow text-slate-900">
@@ -54,7 +60,7 @@ function DashboardLayout() {
           <Link to={getDashboardPath(user?.role)} className="block text-2xl font-semibold tracking-tight">
             MedAxis HMS
           </Link>
-          <p className="mt-2 text-sm text-slate-300">Care operations and admin control center</p>
+          <p className="mt-2 text-sm text-slate-300">{t("brand.tagline")}</p>
 
           <nav className="mt-10 flex-1 space-y-2 overflow-y-auto pr-1">
             {navItems.map(({ to, label, icon: Icon }) => (
@@ -74,37 +80,46 @@ function DashboardLayout() {
           </nav>
 
           <div className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-4">
-            <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Signed in as</p>
-            <p className="mt-2 font-medium text-white">{user?.name || "Hospital Admin"}</p>
-            <p className="text-sm capitalize text-slate-300">{user?.role || "admin"}</p>
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300">
+                {t("language.label")}
+              </span>
+              <LanguageSwitcher compact showLabel={false} className="border-0 bg-transparent p-0 shadow-none" />
+            </div>
+            <p className="mt-4 text-xs uppercase tracking-[0.25em] text-slate-400">{t("brand.signedInAs")}</p>
+            <p className="mt-2 font-medium text-white">{user?.name || t("brand.userFallback")}</p>
+            <p className="text-sm text-slate-300">{roleLabel}</p>
             <button
               type="button"
               onClick={logout}
               className="mt-4 flex items-center gap-2 text-sm text-red-300 transition hover:text-red-200"
             >
               <HiOutlineArrowRightOnRectangle />
-              Logout
+              {t("brand.logout")}
             </button>
           </div>
         </aside>
 
         <div className="sticky top-0 z-30 border-b border-mist-200 bg-white/95 backdrop-blur lg:hidden">
-          <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-            <div>
-              <Link to={getDashboardPath(user?.role)} className="text-base font-semibold text-slate-900 sm:text-lg">
+          <div className="flex items-start justify-between gap-3 px-4 py-3 sm:px-6">
+            <div className="min-w-0 flex-1">
+              <Link to={getDashboardPath(user?.role)} className="block max-w-[112px] text-[1.05rem] font-semibold leading-tight text-slate-900 sm:max-w-none sm:text-lg">
                 MedAxis HMS
               </Link>
-              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 sm:text-xs sm:tracking-[0.22em]">
-                {user?.role || "user"} panel
+              <p className="mt-1 text-[10px] uppercase tracking-[0.22em] text-slate-500 sm:text-xs">
+                {t("brand.panel", { role: roleLabel })}
               </p>
             </div>
-            <button
-              type="button"
-              className="rounded-2xl border border-mist-200 bg-white p-2 text-slate-700 shadow-sm"
-              onClick={() => setIsMobileSidebarOpen((value) => !value)}
-            >
-              {isMobileSidebarOpen ? <HiOutlineXMark className="text-2xl" /> : <HiOutlineBars3 className="text-2xl" />}
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <LanguageSwitcher tone="light" compact showLabel={false} />
+              <button
+                type="button"
+                className="rounded-2xl border border-mist-200 bg-white p-2.5 text-slate-700 shadow-sm"
+                onClick={() => setIsMobileSidebarOpen((value) => !value)}
+              >
+                {isMobileSidebarOpen ? <HiOutlineXMark className="text-2xl" /> : <HiOutlineBars3 className="text-2xl" />}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -117,7 +132,7 @@ function DashboardLayout() {
               <Link to={getDashboardPath(user?.role)} className="block text-2xl font-semibold tracking-tight" onClick={() => setIsMobileSidebarOpen(false)}>
                 MedAxis HMS
               </Link>
-              <p className="mt-2 text-sm text-slate-400">Care operations and admin control center</p>
+              <p className="mt-2 text-sm text-slate-400">{t("brand.tagline")}</p>
               <nav className="mt-10 space-y-2">
                 {navItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
@@ -136,16 +151,22 @@ function DashboardLayout() {
                 ))}
               </nav>
               <div className="mt-6 rounded-3xl border border-white/10 bg-white/10 p-4">
-                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Signed in as</p>
-                <p className="mt-2 font-medium text-white">{user?.name || "Hospital Admin"}</p>
-                <p className="text-sm capitalize text-slate-300">{user?.role || "admin"}</p>
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-300">
+                    {t("language.label")}
+                  </span>
+                  <LanguageSwitcher compact showLabel={false} className="border-0 bg-transparent p-0 shadow-none" />
+                </div>
+                <p className="mt-4 text-xs uppercase tracking-[0.25em] text-slate-400">{t("brand.signedInAs")}</p>
+                <p className="mt-2 font-medium text-white">{user?.name || t("brand.userFallback")}</p>
+                <p className="text-sm text-slate-300">{roleLabel}</p>
                 <button
                   type="button"
                   onClick={logout}
                   className="mt-4 flex items-center gap-2 text-sm text-red-300 transition hover:text-red-200"
                 >
                   <HiOutlineArrowRightOnRectangle />
-                  Logout
+                  {t("brand.logout")}
                 </button>
               </div>
             </aside>

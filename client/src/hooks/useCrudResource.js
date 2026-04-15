@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function useCrudResource(service, resourceLabel) {
+  const { t } = useLanguage();
   const [items, setItems] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,7 +16,7 @@ export default function useCrudResource(service, resourceLabel) {
       setItems(data.items ?? []);
       setPagination(data.pagination ?? null);
     } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to load ${resourceLabel.toLowerCase()}`);
+      toast.error(error.response?.data?.message || t("error.failedToLoad", { resource: resourceLabel.toLowerCase() }));
     } finally {
       setIsLoading(false);
     }
@@ -28,10 +30,10 @@ export default function useCrudResource(service, resourceLabel) {
     setIsSubmitting(true);
     try {
       await service.create(payload);
-      toast.success(`${resourceLabel} created`);
+      toast.success(t("success.created", { resource: resourceLabel }));
       await loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to create ${resourceLabel.toLowerCase()}`);
+      toast.error(error.response?.data?.message || t("error.create", { resource: resourceLabel.toLowerCase() }));
       throw error;
     } finally {
       setIsSubmitting(false);
@@ -42,10 +44,10 @@ export default function useCrudResource(service, resourceLabel) {
     setIsSubmitting(true);
     try {
       await service.update(id, payload);
-      toast.success(`${resourceLabel} updated`);
+      toast.success(t("success.updated", { resource: resourceLabel }));
       await loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to update ${resourceLabel.toLowerCase()}`);
+      toast.error(error.response?.data?.message || t("error.update", { resource: resourceLabel.toLowerCase() }));
       throw error;
     } finally {
       setIsSubmitting(false);
@@ -56,10 +58,10 @@ export default function useCrudResource(service, resourceLabel) {
     setIsSubmitting(true);
     try {
       await service.remove(id);
-      toast.success(`${resourceLabel} deleted`);
+      toast.success(t("success.deleted", { resource: resourceLabel }));
       await loadItems();
     } catch (error) {
-      toast.error(error.response?.data?.message || `Failed to delete ${resourceLabel.toLowerCase()}`);
+      toast.error(error.response?.data?.message || t("error.delete", { resource: resourceLabel.toLowerCase() }));
       throw error;
     } finally {
       setIsSubmitting(false);
@@ -77,4 +79,3 @@ export default function useCrudResource(service, resourceLabel) {
     deleteItem,
   };
 }
-

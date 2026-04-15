@@ -3,6 +3,9 @@ export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Rajdhani"', '"Noto Sans Devanagari"', '"Segoe UI"', "sans-serif"],
+      },
       colors: {
         brand: {
           50: "#eef8f6",
