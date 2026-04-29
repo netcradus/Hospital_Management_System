@@ -11,7 +11,13 @@ const authMiddleware = asyncHandler(async (req, _res, next) => {
   }
 
   const token = authHeader.split(" ")[1];
-  const decoded = verifyToken(token);
+  let decoded;
+  try {
+    decoded = verifyToken(token);
+  } catch (error) {
+    throw new ApiError(401, "Invalid or expired token");
+  }
+
   const user = await User.findById(decoded.id).select("-password");
 
   if (!user) {
@@ -23,4 +29,3 @@ const authMiddleware = asyncHandler(async (req, _res, next) => {
 });
 
 export default authMiddleware;
-

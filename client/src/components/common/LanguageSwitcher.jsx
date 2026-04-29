@@ -14,7 +14,7 @@ function LanguageSwitcher({ className = "", tone = "dark", compact = false, show
       className={`inline-flex items-center rounded-full ${
         compact ? "gap-2 px-1.5 py-1.5" : "gap-3 px-2.5 py-2.5"
       } shadow-soft backdrop-blur ${
-        isLight ? "border border-mist-200 bg-white" : "border border-white/15 bg-white/10"
+        isLight ? "border border-slate-300 bg-white/95 shadow-sm" : "border border-white/15 bg-white/10"
       } ${className}`}
     >
       {showLabel && (
@@ -43,7 +43,7 @@ function LanguageSwitcher({ className = "", tone = "dark", compact = false, show
                     ? "bg-brand-600 text-white shadow-sm"
                     : "bg-white text-brand-950 shadow-sm"
                   : isLight
-                    ? "text-slate-600 hover:bg-white hover:text-brand-700"
+                    ? "text-slate-800 hover:bg-white hover:text-brand-700"
                     : "text-slate-200 hover:bg-white/10 hover:text-white"
               }`}
               aria-label={option.description}

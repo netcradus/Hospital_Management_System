@@ -12,7 +12,9 @@ const authService = {
   register(payload) {
     return unwrap(api.post("/auth/register", payload));
   },
+  me() {
+    return unwrap(api.get("/auth/me"));
+  },
 };
 
 export default authService;
-

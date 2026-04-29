@@ -8,11 +8,30 @@ import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
 const shouldLogRequests = process.env.HTTP_LOGGING === "true";
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 250,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: {
+    success: false,
+    message: "Too many login attempts. Please wait a few minutes and try again.",
+    statusCode: 429,
+  },
+});
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5000,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 app.use(
   cors({
     origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 app.use(express.json({ limit: "2mb" }));
@@ -24,14 +43,8 @@ if (shouldLogRequests) {
     })
   );
 }
-app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-    standardHeaders: true,
-    legacyHeaders: false,
-  })
-);
+app.use("/api/auth", authLimiter);
+app.use("/api", apiLimiter);
 
 app.get("/api/health", (_req, res) => {
   res.json({

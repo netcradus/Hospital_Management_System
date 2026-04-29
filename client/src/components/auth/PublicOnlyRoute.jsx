@@ -3,7 +3,11 @@ import useAuth from "../../hooks/useAuth";
 import { getDashboardPath } from "../../utils/roleRoutes";
 
 function PublicOnlyRoute({ children }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isBootstrapping, user } = useAuth();
+
+  if (isBootstrapping) {
+    return <div className="min-h-screen bg-[var(--app-bg)]" />;
+  }
 
   if (isAuthenticated) {
     return <Navigate to={getDashboardPath(user?.role)} replace />;
@@ -13,4 +17,3 @@ function PublicOnlyRoute({ children }) {
 }
 
 export default PublicOnlyRoute;
-

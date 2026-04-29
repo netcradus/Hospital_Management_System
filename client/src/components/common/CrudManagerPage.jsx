@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import Button from "./Button";
 import Card from "./Card";
+import ConfirmDialog from "./ConfirmDialog";
 import DataTable from "./DataTable";
 import InputField from "./InputField";
+import PageHeader from "./PageHeader";
 import SelectField from "./SelectField";
 import TextAreaField from "./TextAreaField";
 import { useLanguage } from "../../context/LanguageContext";
@@ -64,6 +66,7 @@ function CrudManagerPage({
 }) {
   const { t } = useLanguage();
   const [editingItem, setEditingItem] = useState(null);
+  const [deletingItem, setDeletingItem] = useState(null);
   const {
     register,
     handleSubmit,
@@ -113,12 +116,8 @@ function CrudManagerPage({
           <Button
             type="button"
             variant="ghost"
-            className="px-3 py-2 text-red-600 hover:bg-red-50"
-            onClick={() => {
-              if (window.confirm(t("crud.confirmDelete", { resource: resourceLabel.toLowerCase() }))) {
-                onDelete(row._id);
-              }
-            }}
+            className="px-3 py-2 text-red-600"
+            onClick={() => setDeletingItem(row)}
           >
             {t("crud.delete")}
           </Button>
@@ -129,11 +128,7 @@ function CrudManagerPage({
 
   return (
     <div className="space-y-5 sm:space-y-6">
-      <div>
-        <p className="text-xs uppercase tracking-[0.18em] text-brand-600 sm:text-sm sm:tracking-[0.25em]">{t("crud.management", { resource: resourceLabel })}</p>
-        <h1 className="mt-2 text-2xl font-semibold leading-tight text-slate-900 sm:text-3xl">{title}</h1>
-        <p className="mt-2 max-w-2xl text-sm text-slate-500 sm:text-base">{subtitle}</p>
-      </div>
+      <PageHeader title={title} description={subtitle} eyebrow={t("crud.management", { resource: resourceLabel })} />
 
       <section className="grid gap-6 2xl:grid-cols-[1.25fr_0.75fr]">
         <Card
@@ -173,11 +168,34 @@ function CrudManagerPage({
         <Card
           title={t("crud.directory", { resource: resourceLabel })}
           subtitle={description}
-          action={<span className="text-xs text-slate-500 sm:text-sm">{isLoading ? t("common.loading") : t("crud.recordsCount", { count: items.length })}</span>}
+          action={<span className="text-xs text-[var(--text-muted)] sm:text-sm">{isLoading ? t("common.loading") : t("crud.recordsCount", { count: items.length })}</span>}
         >
-          <DataTable columns={tableColumns} rows={rows} />
+          <DataTable
+            columns={tableColumns}
+            rows={rows}
+            isLoading={isLoading}
+            title={`${resourceLabel} directory`}
+            emptyTitle={`No ${resourceLabel.toLowerCase()} records yet`}
+            emptyDescription={description}
+          />
         </Card>
       </section>
+
+      <ConfirmDialog
+        open={Boolean(deletingItem)}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={async () => {
+          if (!deletingItem) {
+            return;
+          }
+
+          await onDelete(deletingItem._id);
+          setDeletingItem(null);
+        }}
+        title={`Delete ${resourceLabel}`}
+        description={t("crud.confirmDelete", { resource: resourceLabel.toLowerCase() })}
+        confirmLabel={t("crud.delete")}
+      />
     </div>
   );
 }

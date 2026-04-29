@@ -1,4 +1,5 @@
 import { Outlet } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
 import { useLanguage } from "../../context/LanguageContext";
 import LanguageSwitcher from "./LanguageSwitcher";
 
@@ -6,12 +7,15 @@ function AuthLayout() {
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen overflow-hidden bg-hero-grid px-4 py-4 text-slate-100 sm:px-6 sm:py-6">
+    <div className="min-h-screen overflow-hidden bg-[var(--app-bg)] px-4 py-4 text-[var(--text-primary)] sm:px-6 sm:py-6">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-7xl gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
         <div className="lg:col-span-2 lg:flex lg:justify-end">
-          <LanguageSwitcher className="border-white/20 bg-white/8" />
+          <div className="flex items-center gap-2 rounded-full bg-[var(--panel-bg)]/80 px-2 py-2 shadow-[var(--panel-shadow)] backdrop-blur">
+            <LanguageSwitcher className="border-[var(--border-color)] bg-[var(--panel-bg)] text-[var(--text-primary)]" />
+            <ThemeToggle />
+          </div>
         </div>
-        <section className="relative hidden h-full overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-soft backdrop-blur lg:flex lg:min-h-[calc(100vh-3rem)] lg:flex-col lg:justify-between lg:p-10 xl:p-12">
+        <section className="relative hidden h-full overflow-hidden rounded-[32px] border border-brand-500/10 bg-hero-grid shadow-[var(--panel-shadow)] backdrop-blur lg:flex lg:min-h-[calc(100vh-3rem)] lg:flex-col lg:justify-between lg:p-10 xl:p-12">
           <div className="absolute -right-20 top-10 h-52 w-52 rounded-full bg-accent-500/20 blur-3xl" />
           <div className="absolute bottom-0 left-0 h-56 w-56 rounded-full bg-brand-500/20 blur-3xl" />
           <div className="relative z-10">
