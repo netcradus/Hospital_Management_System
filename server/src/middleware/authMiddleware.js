@@ -2,6 +2,7 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { verifyToken } from "../config/jwt.js";
 import User from "../models/User.js";
+import { ensureUserSubscriptionScope } from "../services/subscriptionService.js";
 
 const authMiddleware = asyncHandler(async (req, _res, next) => {
   const authHeader = req.headers.authorization;
@@ -24,6 +25,7 @@ const authMiddleware = asyncHandler(async (req, _res, next) => {
     throw new ApiError(401, "User not found");
   }
 
+  await ensureUserSubscriptionScope(user);
   req.user = user;
   next();
 });

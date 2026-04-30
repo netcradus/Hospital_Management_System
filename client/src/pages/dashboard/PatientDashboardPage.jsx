@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { HiOutlineCalendarDays, HiOutlineClipboardDocumentList, HiOutlineCreditCard, HiOutlinePhone } from "react-icons/hi2";
 import Card from "../../components/common/Card";
 import EmptyState from "../../components/common/EmptyState";
@@ -18,7 +18,7 @@ const billingService = createEntityService("billing");
 
 function PatientDashboardPage() {
   const { user } = useAuth();
-  const { language, formatCurrency } = useLanguage();
+  const { language, formatCurrency, normalizeText } = useLanguage();
   const loadPatientDashboard = useCallback(async () => {
       const [patients, appointments, billing] = await Promise.all([
         patientService.list({ limit: 100 }),
@@ -52,8 +52,9 @@ function PatientDashboardPage() {
   });
 
   const upcomingAppointments = (data?.appointments || []).filter((item) => item.status === "Scheduled");
-  const copy =
-    language === "hi"
+  const copy = useMemo(() => {
+    const raw =
+      language === "hi"
       ? {
           eyebrow: "पेशेंट डैशबोर्ड",
           title: `नमस्ते, ${data?.patientProfile?.firstName || user?.name || "मरीज"}`,
@@ -122,6 +123,11 @@ function PatientDashboardPage() {
           noBillingDesc: "Your payment history will show up here once invoices are generated.",
           assignedDoctor: "Assigned doctor",
         };
+
+    return Object.fromEntries(
+      Object.entries(raw).map(([key, value]) => [key, typeof value === "string" ? normalizeText(value) : value])
+    );
+  }, [data?.patientProfile?.firstName, language, normalizeText, user?.name]);
 
   return (
     <div className="space-y-6">

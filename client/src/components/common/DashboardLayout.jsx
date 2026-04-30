@@ -18,6 +18,7 @@ import {
 } from "react-icons/hi2";
 import useAuth from "../../hooks/useAuth";
 import useLiveQuery from "../../hooks/useLiveQuery";
+import useSubscription from "../../hooks/useSubscription";
 import { useLanguage } from "../../context/LanguageContext";
 import { createEntityService } from "../../services/entityService";
 import { getLeaveRequests } from "../../utils/leaveRequests";
@@ -28,7 +29,6 @@ import Button from "./Button";
 import LanguageSwitcher from "./LanguageSwitcher";
 import Modal from "./Modal";
 import ThemeToggle from "./ThemeToggle";
-import SubscriptionModal from "../subscription/SubscriptionModal";
 
 const appointmentService = createEntityService("appointments");
 const billingService = createEntityService("billing");
@@ -36,12 +36,12 @@ const NOTIFICATION_STORAGE_KEY = "hms_notification_reads";
 
 function DashboardLayout() {
   const { user, logout } = useAuth();
+  const { openManager } = useSubscription();
   const { t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [subscriptionOpen, setSubscriptionOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [leaveNotificationRevision, setLeaveNotificationRevision] = useState(0);
   const [isDesktop, setIsDesktop] = useState(() => (typeof window !== "undefined" ? window.innerWidth >= 1024 : true));
@@ -257,7 +257,7 @@ function DashboardLayout() {
           <div className="space-y-3">
             <button
               type="button"
-              onClick={() => setSubscriptionOpen(true)}
+              onClick={openManager}
               className={`flex min-h-[48px] w-full items-center ${isSidebarCollapsed ? "justify-center px-2" : "gap-3 px-4"} rounded-2xl bg-white/10 text-left text-sm transition hover:bg-white/15`}
               title="Manage plan"
             >
@@ -358,8 +358,6 @@ function DashboardLayout() {
           </div>
         </main>
       </div>
-
-      <SubscriptionModal open={subscriptionOpen} onClose={() => setSubscriptionOpen(false)} />
 
       <Modal
         open={notificationsOpen}

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 const STORAGE_KEY = "medaxis-language";
+const textDecoder = typeof TextDecoder !== "undefined" ? new TextDecoder("utf-8") : null;
 
 const translations = {
   en: {
@@ -18,11 +19,11 @@ const translations = {
     "nav.appointments": "Appointments",
     "nav.billing": "Billing",
     "nav.departments": "Departments",
-    "nav.staff": "Staff",
+    "nav.staff": "Receptionist",
     "role.admin": "Admin",
     "role.doctor": "Doctor",
     "role.patient": "Patient",
-    "role.staff": "Staff",
+    "role.staff": "Receptionist",
     "auth.network": "City Care Network",
     "auth.heroTitle": "Hospital operations, patient care, and billing in one calm workspace.",
     "auth.heroDescription": "Designed for administrators, clinicians, staff, and patients with role-aware access and connected records.",
@@ -63,8 +64,8 @@ const translations = {
     "dashboard.doctorTitle": "Your daily patient schedule",
     "dashboard.patientLabel": "Patient Dashboard",
     "dashboard.patientTitle": "Care journey at a glance",
-    "dashboard.staffLabel": "Staff Dashboard",
-    "dashboard.staffTitle": "Front desk and operations overview",
+    "dashboard.staffLabel": "Receptionist Dashboard",
+    "dashboard.staffTitle": "Reception and operations overview",
     "dashboard.staffDescription": "Track check-ins, booking flow, and operational tasks assigned to support teams.",
     "stats.patients": "Patients",
     "stats.doctors": "Doctors",
@@ -132,7 +133,7 @@ const translations = {
     "resource.appointment": "Appointment",
     "resource.billing": "Billing",
     "resource.department": "Department",
-    "resource.staff": "Staff",
+    "resource.staff": "Receptionist",
     "patients.title": "Patient records",
     "patients.subtitle": "Create, update, view, and delete patient profiles from the live backend.",
     "patients.description": "Real-time patient data from MongoDB.",
@@ -192,9 +193,9 @@ const translations = {
     "departments.name": "Department name",
     "departments.nameRequired": "Department name is required",
     "departments.descriptionField": "Description",
-    "staff.title": "Staff management",
-    "staff.subtitle": "Manage staff profiles, roles, and department assignments from the backend.",
-    "staff.description": "Live staff directory with full CRUD actions.",
+    "staff.title": "Reception management",
+    "staff.subtitle": "Manage receptionist profiles, roles, and department assignments from the backend.",
+    "staff.description": "Live receptionist directory with full CRUD actions.",
     "staff.role": "Role",
     "staff.roleRequired": "Role is required",
     "field.description": "Description",
@@ -248,11 +249,11 @@ const translations = {
     "nav.appointments": "अपॉइंटमेंट",
     "nav.billing": "बिलिंग",
     "nav.departments": "विभाग",
-    "nav.staff": "स्टाफ",
+    "nav.staff": "रिसेप्शनिस्ट",
     "role.admin": "एडमिन",
     "role.doctor": "डॉक्टर",
     "role.patient": "मरीज",
-    "role.staff": "स्टाफ",
+    "role.staff": "रिसेप्शनिस्ट",
     "auth.network": "सिटी केयर नेटवर्क",
     "auth.heroTitle": "हॉस्पिटल ऑपरेशंस, पेशेंट केयर और बिलिंग अब एक शांत और सुव्यवस्थित वर्कस्पेस में।",
     "auth.heroDescription": "एडमिनिस्ट्रेटर, क्लिनिशियन, स्टाफ और मरीजों के लिए रोल-आधारित एक्सेस और कनेक्टेड रिकॉर्ड्स के साथ तैयार किया गया है।",
@@ -293,7 +294,7 @@ const translations = {
     "dashboard.doctorTitle": "आज का आपका पेशेंट शेड्यूल",
     "dashboard.patientLabel": "पेशेंट डैशबोर्ड",
     "dashboard.patientTitle": "आपकी केयर जर्नी एक नजर में",
-    "dashboard.staffLabel": "स्टाफ डैशबोर्ड",
+    "dashboard.staffLabel": "रिसेप्शनिस्ट डैशबोर्ड",
     "dashboard.staffTitle": "फ्रंट डेस्क और ऑपरेशंस ओवरव्यू",
     "dashboard.staffDescription": "चेक-इन, बुकिंग फ्लो और सपोर्ट टीमों के कार्यों पर नज़र रखें।",
     "stats.patients": "मरीज",
@@ -362,7 +363,7 @@ const translations = {
     "resource.appointment": "अपॉइंटमेंट",
     "resource.billing": "बिलिंग",
     "resource.department": "विभाग",
-    "resource.staff": "स्टाफ",
+    "resource.staff": "रिसेप्शनिस्ट",
     "patients.title": "मरीज रिकॉर्ड",
     "patients.subtitle": "लाइव बैकएंड से मरीज प्रोफाइल बनाएं, अपडेट करें, देखें और हटाएं।",
     "patients.description": "MongoDB से रियल-टाइम मरीज डेटा।",
@@ -422,9 +423,9 @@ const translations = {
     "departments.name": "विभाग का नाम",
     "departments.nameRequired": "विभाग का नाम आवश्यक है",
     "departments.descriptionField": "विवरण",
-    "staff.title": "स्टाफ प्रबंधन",
-    "staff.subtitle": "बैकएंड से स्टाफ प्रोफाइल, भूमिकाएं और विभाग असाइनमेंट प्रबंधित करें।",
-    "staff.description": "पूर्ण CRUD एक्शन के साथ लाइव स्टाफ डायरेक्टरी।",
+    "staff.title": "रिसेप्शन प्रबंधन",
+    "staff.subtitle": "बैकएंड से रिसेप्शनिस्ट प्रोफाइल, भूमिकाएं और विभाग असाइनमेंट प्रबंधित करें।",
+    "staff.description": "पूर्ण CRUD एक्शन के साथ लाइव रिसेप्शनिस्ट डायरेक्टरी।",
     "staff.role": "भूमिका",
     "staff.roleRequired": "भूमिका आवश्यक है",
     "field.description": "विवरण",
@@ -474,6 +475,20 @@ function interpolate(template, values) {
   );
 }
 
+function repairMojibake(value) {
+  if (typeof value !== "string" || !textDecoder || !/(?:à¤|à¥)/.test(value)) {
+    return value;
+  }
+
+  try {
+    const bytes = Uint8Array.from(value, (character) => character.charCodeAt(0) & 0xff);
+    const decoded = textDecoder.decode(bytes);
+    return /[\u0900-\u097F]/.test(decoded) ? decoded : value;
+  } catch (_error) {
+    return value;
+  }
+}
+
 export function LanguageProvider({ children }) {
   const [language, setLanguage] = useState(() => {
     if (typeof window === "undefined") {
@@ -492,7 +507,8 @@ export function LanguageProvider({ children }) {
     const locale = language === "hi" ? "hi-IN" : "en-IN";
     const dictionary = translations[language] || translations.en;
 
-    const t = (key, values) => interpolate(dictionary[key] || translations.en[key] || key, values);
+    const normalizeText = (text) => (language === "hi" ? repairMojibake(text) : text);
+    const t = (key, values) => normalizeText(interpolate(dictionary[key] || translations.en[key] || key, values));
     const formatDate = (value) => new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(new Date(value));
     const formatCurrency = (value) =>
       new Intl.NumberFormat(locale, {
@@ -507,6 +523,7 @@ export function LanguageProvider({ children }) {
       t,
       formatDate,
       formatCurrency,
+      normalizeText,
     };
   }, [language]);
 

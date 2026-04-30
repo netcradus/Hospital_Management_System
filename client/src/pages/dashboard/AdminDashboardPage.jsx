@@ -59,7 +59,7 @@ function downloadCsv(rows, filename) {
 
 function AdminDashboardPage() {
   const navigate = useNavigate();
-  const { language, formatCurrency } = useLanguage();
+  const { language, formatCurrency, normalizeText } = useLanguage();
   const [selectedBed, setSelectedBed] = useState(null);
   const [timeRange, setTimeRange] = useState("today");
   const [leaveRevision, setLeaveRevision] = useState(0);
@@ -70,9 +70,8 @@ function AdminDashboardPage() {
     return () => window.removeEventListener("hms:leave-requests-updated", handleLeaveUpdate);
   }, []);
 
-  const copy = useMemo(
-    () =>
-      language === "hi"
+  const copy = useMemo(() => {
+      const raw = language === "hi"
         ? {
             eyebrow: "हॉस्पिटल कमांड सेंटर",
             title: "ऑपरेशनल ओवरव्यू",
@@ -202,9 +201,12 @@ function AdminDashboardPage() {
             notProvided: "Not provided",
             general: "General",
             room: "Room",
-          },
-    [language]
-  );
+          };
+
+      return Object.fromEntries(
+        Object.entries(raw).map(([key, value]) => [key, typeof value === "string" ? normalizeText(value) : value])
+      );
+    }, [language, normalizeText]);
 
   const loadDashboard = useCallback(async () => {
     const [patients, doctors, appointments, billing, departments, staff] = await Promise.all([
@@ -513,31 +515,33 @@ function AdminDashboardPage() {
           </div>
         </Card>
 
-        <Card title={copy.leaveRequests} subtitle={copy.leaveRequestsSub}>
+        <Card title={copy.leaveRequests} subtitle={copy.leaveRequestsSub} className="xl:col-span-2 2xl:col-span-3">
           <div className="space-y-3">
             {(data?.live.leaveRequests || []).length ? (
-              data.live.leaveRequests.map((request) => (
-                <div key={request.id} className="rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium text-[var(--text-primary)]">{request.doctorName}</p>
-                      <p className="mt-1 text-sm text-[var(--text-muted)]">{`${request.from} - ${request.to}`}</p>
-                      <p className="mt-2 text-sm text-[var(--text-secondary)]">{request.reason}</p>
+              <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                {data.live.leaveRequests.map((request) => (
+                  <div key={request.id} className="flex h-full flex-col rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-semibold text-[var(--text-primary)]">{request.doctorName}</p>
+                        <p className="mt-1 text-sm text-[var(--text-muted)]">{`${request.from} - ${request.to}`}</p>
+                        <p className="mt-2 line-clamp-3 text-sm text-[var(--text-secondary)] break-words">{request.reason}</p>
+                      </div>
+                      <Badge variant={request.status === "Approved" ? "success" : request.status === "Rejected" ? "danger" : "warning"}>
+                        {request.status === "Approved" ? copy.approved : request.status === "Rejected" ? copy.rejected : copy.pending}
+                      </Badge>
                     </div>
-                    <Badge variant={request.status === "Approved" ? "success" : request.status === "Rejected" ? "danger" : "warning"}>
-                      {request.status === "Approved" ? copy.approved : request.status === "Rejected" ? copy.rejected : copy.pending}
-                    </Badge>
+                    <div className="mt-4 flex flex-col gap-3 sm:mt-auto sm:flex-row">
+                      <Button type="button" variant="secondary" className="w-full whitespace-nowrap sm:flex-1" onClick={() => updateLeaveRequestStatus(request.id, "Approved")}>
+                        {copy.approve}
+                      </Button>
+                      <Button type="button" variant="ghost" className="w-full whitespace-nowrap text-rose-600 sm:flex-1" onClick={() => updateLeaveRequestStatus(request.id, "Rejected")}>
+                        {copy.reject}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="mt-4 flex gap-3">
-                    <Button type="button" variant="secondary" className="flex-1" onClick={() => updateLeaveRequestStatus(request.id, "Approved")}>
-                      {copy.approve}
-                    </Button>
-                    <Button type="button" variant="ghost" className="flex-1 text-rose-600" onClick={() => updateLeaveRequestStatus(request.id, "Rejected")}>
-                      {copy.reject}
-                    </Button>
-                  </div>
-                </div>
-              ))
+                ))}
+              </div>
             ) : (
               <EmptyState title={copy.noLeaveRequests} description={copy.noLeaveRequestsDesc} />
             )}

@@ -1,6 +1,8 @@
-function Card({ title, subtitle, children, action }) {
+import { cn } from "../../utils/cn";
+
+function Card({ title, subtitle, children, action, className = "" }) {
   return (
-    <section className="rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-bg)] p-4 shadow-[var(--panel-shadow)] backdrop-blur sm:rounded-[28px] sm:p-6">
+    <section className={cn("rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-bg)] p-4 shadow-[var(--panel-shadow)] backdrop-blur sm:rounded-[28px] sm:p-6", className)}>
       {(title || subtitle || action) && (
         <div className="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-start sm:justify-between">
           <div>

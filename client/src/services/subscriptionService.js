@@ -1,31 +1,25 @@
 import api from "./api";
 
-const unavailableFallback = {
-  available: false,
-  status: "unknown",
-  planPrice: 1999,
-};
+async function unwrap(promise) {
+  const { data } = await promise;
+  return data.data;
+}
 
 const subscriptionService = {
-  async getStatus() {
-    try {
-      const response = await api.get("/subscriptions/status");
-      return {
-        available: true,
-        ...response.data.data,
-      };
-    } catch (error) {
-      if (error.response?.status === 404) {
-        return unavailableFallback;
-      }
-
-      throw error;
-    }
+  getPlans() {
+    return unwrap(api.get("/subscription/plans"));
   },
-
-  async create(payload) {
-    const response = await api.post("/subscriptions/create", payload);
-    return response.data.data;
+  getCurrent() {
+    return unwrap(api.get("/subscription/current"));
+  },
+  getStatus() {
+    return unwrap(api.get("/subscription/status"));
+  },
+  create(payload) {
+    return unwrap(api.post("/subscription/create", payload));
+  },
+  renew(payload) {
+    return unwrap(api.post("/subscription/renew", payload));
   },
 };
 

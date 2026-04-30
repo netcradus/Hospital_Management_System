@@ -3,6 +3,7 @@ import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { sendSuccess } from "../utils/responseHandler.js";
 import { signAccessToken, signRefreshToken } from "../config/jwt.js";
+import { ensureUserSubscriptionScope } from "../services/subscriptionService.js";
 
 function buildAuthPayload(user) {
   const safeUser = {
@@ -10,6 +11,7 @@ function buildAuthPayload(user) {
     name: user.name,
     email: user.email,
     role: user.role,
+    organizationKey: user.organizationKey,
   };
 
   return {
@@ -22,7 +24,7 @@ function buildAuthPayload(user) {
 }
 
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, organizationKey } = req.body;
 
   if (!name || !email || !password) {
     throw new ApiError(400, "Name, email, and password are required");
@@ -33,7 +35,9 @@ export const register = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User already exists");
   }
 
-  const user = await User.create({ name, email, password, role });
+  const user = new User({ name, email, password, role, organizationKey });
+  user.organizationKey = `user:${user._id}`;
+  await user.save();
   sendSuccess(res, "Registration successful", buildAuthPayload(user), 201);
 });
 
@@ -54,6 +58,7 @@ export const login = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid credentials");
   }
 
+  await ensureUserSubscriptionScope(user);
   sendSuccess(res, "Login successful", buildAuthPayload(user));
 });
 
@@ -61,3 +66,6 @@ export const profile = asyncHandler(async (req, res) => {
   sendSuccess(res, "Profile fetched", req.user);
 });
 
+export const logout = asyncHandler(async (_req, res) => {
+  sendSuccess(res, "Logout successful", { loggedOut: true });
+});

@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import App from "./App";
 import { AuthProvider } from "./context/AuthContext";
 import { LanguageProvider } from "./context/LanguageContext";
+import { SubscriptionProvider } from "./context/SubscriptionContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import "./styles/index.css";
 
@@ -13,8 +14,10 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
-          <App />
-          <Toaster position="top-right" richColors />
+          <SubscriptionProvider>
+            <App />
+            <Toaster position="top-right" richColors />
+          </SubscriptionProvider>
         </AuthProvider>
       </LanguageProvider>
     </ThemeProvider>

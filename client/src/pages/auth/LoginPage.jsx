@@ -43,7 +43,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-xl rounded-[32px] border border-[var(--border-color)] bg-[var(--panel-bg)] p-5 shadow-[var(--panel-shadow)] backdrop-blur-xl transition-all duration-300 sm:p-8">
+    <div className="mx-auto w-full max-w-xl rounded-[32px] border border-[var(--border-color)] bg-[var(--panel-bg)] p-5 shadow-[var(--panel-shadow)] backdrop-blur-xl transition-all duration-300 sm:p-8">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="inline-flex rounded-full bg-brand-500/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-brand-800 dark:text-brand-100">
@@ -103,7 +103,7 @@ function LoginPage() {
               <option value="">Auto-detect role</option>
               <option value="admin">Admin</option>
               <option value="doctor">Doctor</option>
-              <option value="staff">Staff</option>
+              <option value="staff">Receptionist</option>
               <option value="patient">Patient</option>
             </select>
           </label>

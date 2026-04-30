@@ -7,11 +7,11 @@ function AuthLayout() {
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[var(--app-bg)] px-4 py-4 text-[var(--text-primary)] sm:px-6 sm:py-6">
+    <div className="min-h-screen overflow-x-hidden bg-[var(--app-bg)] px-4 py-4 text-[var(--text-primary)] sm:px-6 sm:py-6">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-7xl gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
-        <div className="lg:col-span-2 lg:flex lg:justify-end">
-          <div className="flex items-center gap-2 rounded-full bg-[var(--panel-bg)]/80 px-2 py-2 shadow-[var(--panel-shadow)] backdrop-blur">
-            <LanguageSwitcher className="border-[var(--border-color)] bg-[var(--panel-bg)] text-[var(--text-primary)]" />
+        <div className="flex justify-center lg:col-span-2 lg:justify-end">
+          <div className="flex max-w-full items-center gap-2 rounded-full bg-[var(--panel-bg)]/85 px-2 py-2 shadow-[var(--panel-shadow)] backdrop-blur">
+            <LanguageSwitcher compact className="border-[var(--border-color)] bg-[var(--panel-bg)] text-[var(--text-primary)]" />
             <ThemeToggle />
           </div>
         </div>

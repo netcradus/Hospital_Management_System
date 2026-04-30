@@ -25,16 +25,15 @@ const doctorService = createEntityService("doctors");
 
 function DoctorDashboardPage() {
   const { user } = useAuth();
-  const { language, formatCurrency } = useLanguage();
+  const { language, formatCurrency, normalizeText } = useLanguage();
   const [selectedAppointment, setSelectedAppointment] = useState(null);
   const [patientSearch, setPatientSearch] = useState("");
   const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
   const [leaveForm, setLeaveForm] = useState({ from: "", to: "", reason: "" });
   const debouncedPatientSearch = useDebouncedValue(patientSearch);
 
-  const copy = useMemo(
-    () =>
-      language === "hi"
+  const copy = useMemo(() => {
+      const raw = language === "hi"
         ? {
             eyebrow: "डॉक्टर डैशबोर्ड",
             title: `नमस्ते, ${user?.name || "डॉक्टर"}`,
@@ -140,9 +139,12 @@ function DoctorDashboardPage() {
             prescribePlaceholder: "Drug name, dosage, duration",
             saveDraft: "Save Draft",
             markCompleted: "Mark Completed",
-          },
-    [language, user?.name]
-  );
+          };
+
+      return Object.fromEntries(
+        Object.entries(raw).map(([key, value]) => [key, typeof value === "string" ? normalizeText(value) : value])
+      );
+    }, [language, normalizeText, user?.name]);
 
   const loadDoctorDashboard = useCallback(async () => {
       const [doctors, appointments, patients, billing] = await Promise.all([

@@ -32,7 +32,7 @@ function RegisterPage() {
   };
 
   return (
-    <div className="w-full max-w-xl rounded-[32px] border border-[var(--border-color)] bg-[var(--panel-bg)] p-5 shadow-[var(--panel-shadow)] backdrop-blur-xl sm:p-8">
+    <div className="mx-auto w-full max-w-xl rounded-[32px] border border-[var(--border-color)] bg-[var(--panel-bg)] p-5 shadow-[var(--panel-shadow)] backdrop-blur-xl sm:p-8">
       <div className="inline-flex rounded-full border border-brand-200 bg-brand-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-brand-800 dark:border-brand-400/30 dark:bg-brand-500/16 dark:text-brand-100">
         {t("register.badge")}
       </div>

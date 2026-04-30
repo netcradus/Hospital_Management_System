@@ -11,6 +11,11 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "doctor", "patient", "staff"],
       default: "patient",
     },
+    organizationKey: {
+      type: String,
+      trim: true,
+      index: true,
+    },
   },
   { timestamps: true }
 );
@@ -29,4 +34,3 @@ userSchema.methods.comparePassword = function comparePassword(password) {
 };
 
 export default mongoose.model("User", userSchema);
-

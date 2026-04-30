@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { HiOutlineBeaker, HiOutlineBuildingOffice2, HiOutlineClipboardDocumentList, HiOutlineHeart, HiOutlineUsers } from "react-icons/hi2";
 import Card from "../../components/common/Card";
 import EmptyState from "../../components/common/EmptyState";
@@ -20,7 +20,7 @@ const billingService = createEntityService("billing");
 
 function StaffDashboardPage() {
   const { user } = useAuth();
-  const { language } = useLanguage();
+  const { language, normalizeText } = useLanguage();
   const [search, setSearch] = useState("");
   const loadStaffDashboard = useCallback(async () => {
       const [staff, patients, appointments, billing] = await Promise.all([
@@ -57,8 +57,9 @@ function StaffDashboardPage() {
     `${patient.firstName} ${patient.lastName}`.toLowerCase().includes(search.toLowerCase())
   );
 
-  const copy =
-    language === "hi"
+  const copy = useMemo(() => {
+    const raw =
+      language === "hi"
       ? {
           eyebrow: "स्टाफ ऑपरेशंस",
           title: `${data?.staffProfile?.role || "सपोर्ट टीम"} डैशबोर्ड`,
@@ -145,6 +146,11 @@ function StaffDashboardPage() {
           medicationSupport: "Medication support",
           medicationSupportDesc: "Pharmacy-specific inventory data requires backend endpoints before full stock widgets can go live.",
         };
+
+    return Object.fromEntries(
+      Object.entries(raw).map(([key, value]) => [key, typeof value === "string" ? normalizeText(value) : value])
+    );
+  }, [data?.staffProfile?.role, language, normalizeText]);
 
   return (
     <div className="space-y-6">
