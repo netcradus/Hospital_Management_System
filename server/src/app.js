@@ -43,10 +43,10 @@ if (shouldLogRequests) {
     })
   );
 }
-app.use("/api/auth", authLimiter);
-app.use("/api", apiLimiter);
+app.use("/auth", authLimiter);
+app.use("/", apiLimiter);
 
-app.get("/api/health", (_req, res) => {
+app.get("/health", (_req, res) => {
   res.json({
     success: true,
     message: "Hospital Management API is running",
@@ -55,7 +55,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
-app.use("/api", routes);
+app.use("/", routes);
 app.use(errorHandler);
 
 export default app;
