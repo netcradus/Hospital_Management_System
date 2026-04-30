@@ -330,12 +330,35 @@ function DashboardLayout() {
               style={{ background: "var(--sidebar-bg)" }}
               onClick={(event) => event.stopPropagation()}
             >
-              <Link to={getDashboardPath(user?.role)}>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-100">Hospital System</p>
-                <h1 className="mt-2 text-2xl font-semibold text-white">MedAxis HMS</h1>
-              </Link>
+              <div className="flex items-start justify-between gap-3">
+                <Link to={getDashboardPath(user?.role)} className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-brand-100">Hospital System</p>
+                  <h1 className="mt-2 text-2xl font-semibold text-white">MedAxis HMS</h1>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl bg-white/10 text-white transition hover:bg-white/20"
+                  aria-label="Close menu"
+                >
+                  <HiOutlineXMark className="text-2xl" />
+                </button>
+              </div>
               <nav className="mt-8 flex-1 space-y-2">{navItems.map((item) => renderNavItem(item, false))}</nav>
-              <div className="rounded-[28px] border border-white/10 bg-white/10 p-4">
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileSidebarOpen(false);
+                    openManager();
+                  }}
+                  className="flex min-h-[48px] w-full items-center gap-3 rounded-2xl bg-white/10 px-4 text-left text-sm transition hover:bg-white/15"
+                >
+                  <HiOutlineCog6Tooth className="text-xl shrink-0" />
+                  <span className="text-slate-50">Manage plan</span>
+                </button>
+
+                <div className="rounded-[28px] border border-white/10 bg-white/10 p-4">
                 <div className="flex items-center gap-3">
                   <Avatar name={user?.name} />
                   <div className="min-w-0">
@@ -347,6 +370,7 @@ function DashboardLayout() {
                   <HiOutlineArrowRightOnRectangle />
                   {t("brand.logout")}
                 </button>
+                </div>
               </div>
             </aside>
           </div>
