@@ -7,6 +7,8 @@ import PublicOnlyRoute from "./components/auth/PublicOnlyRoute";
 import RoleHomeRedirect from "./components/auth/RoleHomeRedirect";
 import Skeleton from "./components/common/Skeleton";
 import { useEffect, useState } from "react";
+import { FEATURES } from "./config/features";
+import { ROLE_PERMISSIONS } from "./config/rbac";
 
 const LoginPage = lazy(() => import("./pages/auth/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage"));
@@ -15,11 +17,15 @@ const DoctorDashboardPage = lazy(() => import("./pages/dashboard/DoctorDashboard
 const PatientDashboardPage = lazy(() => import("./pages/dashboard/PatientDashboardPage"));
 const StaffDashboardPage = lazy(() => import("./pages/dashboard/StaffDashboardPage"));
 const PatientsPage = lazy(() => import("./pages/patient/PatientsPage"));
+const PatientProfilePage = lazy(() => import("./pages/patient/PatientProfilePage"));
 const DoctorsPage = lazy(() => import("./pages/doctor/DoctorsPage"));
+const DoctorsManagementPage = lazy(() => import("./pages/admin/DoctorsManagementPage"));
 const AppointmentsPage = lazy(() => import("./pages/appointment/AppointmentsPage"));
 const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
 const DepartmentsPage = lazy(() => import("./pages/department/DepartmentsPage"));
+const DepartmentsManagementPage = lazy(() => import("./pages/admin/DepartmentsManagementPage"));
 const StaffPage = lazy(() => import("./pages/staff/StaffPage"));
+const SubscriptionPage = lazy(() => import("./pages/subscription/SubscriptionPage"));
 const UnauthorizedPage = lazy(() => import("./pages/UnauthorizedPage"));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage"));
 
@@ -52,6 +58,14 @@ function RouteFallback() {
 }
 
 function App() {
+  const dashboardRoles = Object.keys(ROLE_PERMISSIONS).filter((role) => ROLE_PERMISSIONS[role].dashboard.includes("view"));
+  const patientViewRoles = Object.keys(ROLE_PERMISSIONS).filter((role) => ROLE_PERMISSIONS[role].patients.includes("view"));
+  const doctorViewRoles = Object.keys(ROLE_PERMISSIONS).filter((role) => ROLE_PERMISSIONS[role].doctors.includes("view"));
+  const appointmentViewRoles = Object.keys(ROLE_PERMISSIONS).filter((role) => ROLE_PERMISSIONS[role].appointments.includes("view"));
+  const billingViewRoles = Object.keys(ROLE_PERMISSIONS).filter((role) => ROLE_PERMISSIONS[role].billing.includes("view"));
+  const departmentViewRoles = Object.keys(ROLE_PERMISSIONS).filter((role) => ROLE_PERMISSIONS[role].departments.includes("view"));
+  const receptionistViewRoles = Object.keys(ROLE_PERMISSIONS).filter((role) => ROLE_PERMISSIONS[role].receptionist.includes("view"));
+
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
@@ -63,6 +77,7 @@ function App() {
           }
         >
           <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/login" element={<Navigate to="/auth/login" replace />} />
           <Route path="/auth/register" element={<RegisterPage />} />
         </Route>
 
@@ -74,14 +89,16 @@ function App() {
           }
         >
           <Route path="/" element={<RoleHomeRedirect />} />
+          <Route path="/dashboard" element={<RoleHomeRedirect />} />
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
                 <AdminDashboardPage />
               </ProtectedRoute>
             }
           />
+          <Route path="/dashboard/admin" element={<Navigate to="/admin/dashboard" replace />} />
           <Route
             path="/doctor/dashboard"
             element={
@@ -90,6 +107,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/dashboard/doctor" element={<Navigate to="/doctor/dashboard" replace />} />
           <Route
             path="/patient/dashboard"
             element={
@@ -98,18 +116,21 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/dashboard/patient" element={<Navigate to="/patient/dashboard" replace />} />
           <Route
             path="/staff/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["staff"]}>
+              <ProtectedRoute allowedRoles={dashboardRoles}>
                 <StaffDashboardPage />
               </ProtectedRoute>
             }
           />
+          <Route path="/dashboard/receptionist" element={<Navigate to="/staff/dashboard" replace />} />
+          <Route path="/dashboard/lab" element={<Navigate to="/staff/dashboard" replace />} />
           <Route
             path="/admin/patients"
             element={
-              <ProtectedRoute allowedRoles={["admin", "doctor", "staff"]}>
+              <ProtectedRoute allowedRoles={patientViewRoles}>
                 <PatientsPage />
               </ProtectedRoute>
             }
@@ -117,7 +138,7 @@ function App() {
           <Route
             path="/doctor/patients"
             element={
-              <ProtectedRoute allowedRoles={["doctor"]}>
+              <ProtectedRoute allowedRoles={patientViewRoles}>
                 <PatientsPage />
               </ProtectedRoute>
             }
@@ -125,15 +146,55 @@ function App() {
           <Route
             path="/staff/patients"
             element={
-              <ProtectedRoute allowedRoles={["staff"]}>
+              <ProtectedRoute allowedRoles={patientViewRoles}>
                 <PatientsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/patients/:patientId"
+            element={
+              <ProtectedRoute allowedRoles={patientViewRoles}>
+                <PatientProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/patients/:patientId"
+            element={
+              <ProtectedRoute allowedRoles={patientViewRoles}>
+                <PatientProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/patients/:patientId"
+            element={
+              <ProtectedRoute allowedRoles={patientViewRoles}>
+                <PatientProfilePage />
               </ProtectedRoute>
             }
           />
           <Route
             path="/admin/doctors"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
+                <DoctorsManagementPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/doctor/doctors"
+            element={
+              <ProtectedRoute allowedRoles={doctorViewRoles}>
+                <DoctorsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/staff/doctors"
+            element={
+              <ProtectedRoute allowedRoles={doctorViewRoles}>
                 <DoctorsPage />
               </ProtectedRoute>
             }
@@ -141,7 +202,7 @@ function App() {
           <Route
             path="/admin/appointments"
             element={
-              <ProtectedRoute allowedRoles={["admin", "doctor", "patient", "staff"]}>
+              <ProtectedRoute allowedRoles={appointmentViewRoles}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -149,7 +210,7 @@ function App() {
           <Route
             path="/doctor/appointments"
             element={
-              <ProtectedRoute allowedRoles={["doctor"]}>
+              <ProtectedRoute allowedRoles={appointmentViewRoles}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -157,7 +218,7 @@ function App() {
           <Route
             path="/patient/appointments"
             element={
-              <ProtectedRoute allowedRoles={["patient"]}>
+              <ProtectedRoute allowedRoles={appointmentViewRoles}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -165,7 +226,7 @@ function App() {
           <Route
             path="/staff/appointments"
             element={
-              <ProtectedRoute allowedRoles={["staff"]}>
+              <ProtectedRoute allowedRoles={appointmentViewRoles}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -173,7 +234,7 @@ function App() {
           <Route
             path="/admin/billing"
             element={
-              <ProtectedRoute allowedRoles={["admin", "patient", "staff"]}>
+              <ProtectedRoute allowedRoles={billingViewRoles}>
                 <BillingPage />
               </ProtectedRoute>
             }
@@ -181,7 +242,7 @@ function App() {
           <Route
             path="/patient/billing"
             element={
-              <ProtectedRoute allowedRoles={["patient"]}>
+              <ProtectedRoute allowedRoles={billingViewRoles}>
                 <BillingPage />
               </ProtectedRoute>
             }
@@ -189,7 +250,7 @@ function App() {
           <Route
             path="/staff/billing"
             element={
-              <ProtectedRoute allowedRoles={["staff"]}>
+              <ProtectedRoute allowedRoles={billingViewRoles}>
                 <BillingPage />
               </ProtectedRoute>
             }
@@ -197,19 +258,29 @@ function App() {
           <Route
             path="/admin/departments"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
-                <DepartmentsPage />
+              <ProtectedRoute allowedRoles={departmentViewRoles}>
+                <DepartmentsManagementPage />
               </ProtectedRoute>
             }
           />
           <Route
             path="/admin/staff"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute allowedRoles={receptionistViewRoles}>
                 <StaffPage />
               </ProtectedRoute>
             }
           />
+          {FEATURES.SUBSCRIPTION_ENABLED ? (
+            <Route
+              path="/subscription"
+              element={
+                <ProtectedRoute allowedRoles={["admin", "super_admin", "doctor", "patient", "staff", "receptionist", "lab_staff"]}>
+                  <SubscriptionPage />
+                </ProtectedRoute>
+              }
+            />
+          ) : null}
         </Route>
 
         <Route path="/unauthorized" element={<UnauthorizedPage />} />

@@ -9,7 +9,7 @@ function RoleHomeRedirect() {
     return <Navigate to="/auth/login" replace />;
   }
 
-  return <Navigate to={getDashboardPath(user?.role)} replace />;
+  return <Navigate to={getDashboardPath(user?.workspaceRole || user?.role)} replace />;
 }
 
 export default RoleHomeRedirect;

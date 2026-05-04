@@ -1,11 +1,13 @@
 export const roleDashboardPath = {
-  admin: "/admin/dashboard",
-  doctor: "/doctor/dashboard",
-  patient: "/patient/dashboard",
-  staff: "/staff/dashboard",
+  super_admin: "/dashboard/admin",
+  doctor: "/dashboard/doctor",
+  patient: "/dashboard/patient",
+  receptionist: "/dashboard/receptionist",
+  lab_staff: "/dashboard/lab",
+  staff: "/dashboard/receptionist",
 };
 
 export function getDashboardPath(role) {
-  return roleDashboardPath[role] || "/unauthorized";
+  return roleDashboardPath[role] || "/dashboard";
 }
 

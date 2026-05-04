@@ -1,0 +1,7 @@
+export const MOCK_DOCTORS = [
+  { id: "DOC-001", name: "Dr. Priya Sharma", specialization: "Cardiology", department: "Cardiology", experience: "12 years", phone: "+91-9876543210", email: "priya.sharma@hospital.com", status: "active", availableDays: ["Mon", "Tue", "Wed", "Thu", "Fri"], consultationFee: 800, rating: 4.8, patients: 245 },
+  { id: "DOC-002", name: "Dr. Rahul Verma", specialization: "Neurology", department: "Neurology", experience: "8 years", phone: "+91-9876543211", email: "rahul.verma@hospital.com", status: "active", availableDays: ["Mon", "Wed", "Fri"], consultationFee: 1000, rating: 4.6, patients: 189 },
+  { id: "DOC-003", name: "Dr. Anita Patel", specialization: "Pediatrics", department: "Pediatrics", experience: "15 years", phone: "+91-9876543212", email: "anita.patel@hospital.com", status: "active", availableDays: ["Tue", "Thu", "Sat"], consultationFee: 600, rating: 4.9, patients: 312 },
+  { id: "DOC-004", name: "Dr. Suresh Kumar", specialization: "Orthopedics", department: "Orthopedics", experience: "20 years", phone: "+91-9876543213", email: "suresh.kumar@hospital.com", status: "on-leave", availableDays: ["Mon", "Tue", "Thu"], consultationFee: 1200, rating: 4.7, patients: 198 },
+  { id: "DOC-005", name: "Dr. Meena Joshi", specialization: "Gynecology", department: "OB-GYN", experience: "10 years", phone: "+91-9876543214", email: "meena.joshi@hospital.com", status: "active", availableDays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], consultationFee: 900, rating: 4.8, patients: 276 },
+];

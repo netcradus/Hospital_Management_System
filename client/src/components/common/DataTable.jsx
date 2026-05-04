@@ -6,6 +6,37 @@ import EmptyState from "./EmptyState";
 import SearchInput from "./SearchInput";
 import Skeleton from "./Skeleton";
 
+function formatCellValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => formatCellValue(item)).join(", ");
+  }
+
+  if (typeof value === "object") {
+    if ("name" in value && value.name) {
+      return value.name;
+    }
+
+    const firstName = "firstName" in value ? value.firstName : "";
+    const lastName = "lastName" in value ? value.lastName : "";
+    const fullName = `${firstName || ""} ${lastName || ""}`.trim();
+    if (fullName) {
+      return fullName;
+    }
+
+    if ("email" in value && value.email) {
+      return value.email;
+    }
+
+    return value._id || "[object]";
+  }
+
+  return String(value);
+}
+
 function exportCsv(filename, columns, rows) {
   const csvRows = [
     columns.map((column) => column.label).join(","),
@@ -13,7 +44,7 @@ function exportCsv(filename, columns, rows) {
       columns
         .map((column) => {
           const rawValue = column.exportValue ? column.exportValue(row) : row[column.key];
-          return `"${String(rawValue ?? "").replaceAll('"', '""')}"`;
+          return `"${formatCellValue(rawValue).replaceAll('"', '""')}"`;
         })
         .join(",")
     ),
@@ -49,7 +80,7 @@ function DataTable({
       ? rows.filter((row) =>
           columns.some((column) => {
             const rawValue = column.searchValue ? column.searchValue(row) : row[column.key];
-            return String(rawValue ?? "")
+            return formatCellValue(rawValue)
               .toLowerCase()
               .includes(normalizedQuery);
           })
@@ -125,7 +156,7 @@ function DataTable({
                           {column.label}
                         </span>
                         <div className="flex-1 text-right text-sm text-[var(--text-secondary)]">
-                          {column.render ? column.render(row[column.key], row) : row[column.key] ?? "-"}
+                          {column.render ? column.render(row[column.key], row) : formatCellValue(row[column.key])}
                         </div>
                       </div>
                     ))}
@@ -159,7 +190,7 @@ function DataTable({
                     <tr key={row._id || row.id || index} className="transition hover:bg-[var(--panel-muted)]/70">
                       {columns.map((column) => (
                         <td key={column.key} className="px-5 py-4 text-sm text-[var(--text-secondary)]">
-                          {column.render ? column.render(row[column.key], row) : row[column.key] ?? "-"}
+                          {column.render ? column.render(row[column.key], row) : formatCellValue(row[column.key])}
                         </td>
                       ))}
                     </tr>

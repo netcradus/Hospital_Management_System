@@ -3,6 +3,17 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { buildSubscriptionStatus, getCurrentSubscription, resolveOrganizationKey } from "../services/subscriptionService.js";
 
 const checkSubscription = asyncHandler(async (req, _res, next) => {
+  const subscriptionDisabled = process.env.AUTH_DEMO_MODE === "true" || process.env.DISABLE_SUBSCRIPTION === "true";
+
+  if (subscriptionDisabled) {
+    req.subscription = {
+      isActive: true,
+      code: "ACTIVE",
+      reason: "ACTIVE",
+    };
+    return next();
+  }
+
   const organizationKey = resolveOrganizationKey(req.user);
   const subscription = await getCurrentSubscription(organizationKey);
   const status = buildSubscriptionStatus(subscription);

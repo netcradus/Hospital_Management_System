@@ -7,12 +7,15 @@
 :root {
   color-scheme: light;
   font-family: "Rajdhani", "Noto Sans Devanagari", "Segoe UI", sans-serif;
+  --teal: #1abc9c;
+  --teal-dark: #0f766e;
+  --blue: #2980e8;
   --app-bg:
-    radial-gradient(circle at top left, rgba(24, 143, 131, 0.12), transparent 24%),
-    linear-gradient(180deg, #f5fbfb 0%, #e9f2f3 100%);
+    radial-gradient(circle at top left, rgba(26, 188, 156, 0.12), transparent 24%),
+    linear-gradient(180deg, #f8fffe 0%, #edf8f7 100%);
   --panel-bg: rgba(255, 255, 255, 0.96);
-  --panel-muted: rgba(233, 242, 243, 0.96);
-  --sidebar-bg: linear-gradient(180deg, rgba(7, 42, 43, 0.98), rgba(10, 59, 63, 0.94));
+  --panel-muted: rgba(237, 248, 247, 0.96);
+  --sidebar-bg: linear-gradient(180deg, rgba(15, 118, 110, 0.98), rgba(12, 79, 137, 0.94));
   --sidebar-text: #e8f6f5;
   --text-primary: #0f172a;
   --text-secondary: #1f2d3d;
@@ -20,18 +23,18 @@
   --text-dim: #61748d;
   --field-label: #32435a;
   --border-color: rgba(71, 85, 105, 0.24);
-  --panel-shadow: 0 24px 60px -28px rgba(5, 37, 39, 0.16);
-  --badge-surface: rgba(24, 143, 131, 0.16);
-  --badge-text: #0c4f49;
-  background: #eef5f5;
+  --panel-shadow: 0 24px 60px -28px rgba(12, 89, 99, 0.16);
+  --badge-surface: rgba(26, 188, 156, 0.16);
+  --badge-text: #0f766e;
+  background: #f3fffd;
   color: #0f172a;
 }
 
 .dark {
   color-scheme: dark;
   --app-bg:
-    radial-gradient(circle at top left, rgba(24, 143, 131, 0.16), transparent 26%),
-    linear-gradient(180deg, #081827 0%, #0d2236 100%);
+    radial-gradient(circle at top left, rgba(26, 188, 156, 0.16), transparent 26%),
+    linear-gradient(180deg, #071823 0%, #0c2642 100%);
   --panel-bg: rgba(10, 23, 38, 0.84);
   --panel-muted: rgba(15, 32, 50, 0.92);
   --sidebar-bg: linear-gradient(180deg, rgba(6, 18, 30, 0.98), rgba(10, 26, 42, 0.94));
@@ -97,7 +100,7 @@ a {
 }
 
 ::selection {
-  background: rgba(24, 143, 131, 0.18);
+  background: rgba(26, 188, 156, 0.18);
 }
 
 .stat-progress {
@@ -169,6 +172,73 @@ a {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatY {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes quoteFloat {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes drift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(8px, -18px, 0) scale(1.05);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 18px 42px -22px rgba(26, 188, 156, 0.5);
+  }
+  50% {
+    box-shadow: 0 22px 50px -18px rgba(41, 128, 232, 0.45);
+  }
+}
+
+.animate-fade-up {
+  animation: fadeUp 560ms ease-out both;
+}
+
+.animate-float-y {
+  animation: floatY 4.5s ease-in-out infinite;
+}
+
+.animate-quote-float {
+  animation: quoteFloat 3.6s ease-in-out infinite;
+}
+
+.animate-drift {
+  animation: drift 9s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.2s ease-in-out infinite;
 }
 
 @keyframes modalIn {

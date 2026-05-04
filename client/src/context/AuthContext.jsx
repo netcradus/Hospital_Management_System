@@ -1,6 +1,7 @@
 import { createContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import authService from "../services/authService";
+import { deriveWorkspaceRole, enrichUserWithWorkspaceRole, persistWorkspaceRole } from "../utils/workspaceRole";
 
 export const AuthContext = createContext(null);
 
@@ -10,11 +11,34 @@ const getErrorMessage = (error, fallback) => error.response?.data?.message || fa
 function clearStoredSession() {
   localStorage.removeItem(STORAGE_KEY);
   sessionStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem("hms_demo_user");
+  localStorage.removeItem("userRole");
 }
 
 function persistSession(nextSession) {
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
   localStorage.removeItem(STORAGE_KEY);
+}
+
+function persistSessionWithPreference(nextSession, rememberMe) {
+  if (rememberMe) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
+    sessionStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+
+  persistSession(nextSession);
+}
+
+function enrichSession(session) {
+  if (!session) {
+    return null;
+  }
+
+  return {
+    ...session,
+    user: enrichUserWithWorkspaceRole(session.user),
+  };
 }
 
 function isTokenExpired(token) {
@@ -37,45 +61,46 @@ function isTokenExpired(token) {
 
 function readStoredSession() {
   try {
-      const persistentSession = localStorage.getItem(STORAGE_KEY);
-      if (persistentSession) {
-        const parsedSession = JSON.parse(persistentSession);
-        if (isTokenExpired(parsedSession?.tokens?.accessToken)) {
-          clearStoredSession();
-          return { session: null };
-        }
-        persistSession(parsedSession);
-        return { session: parsedSession };
+    const persistentSession = localStorage.getItem(STORAGE_KEY);
+    if (persistentSession) {
+      const parsedSession = enrichSession(JSON.parse(persistentSession));
+      if (isTokenExpired(parsedSession?.tokens?.accessToken)) {
+        clearStoredSession();
+        return { session: null, rememberMe: false };
       }
+      return { session: parsedSession, rememberMe: true };
+    }
 
-      const transientSession = sessionStorage.getItem(STORAGE_KEY);
-      if (transientSession) {
-        const parsedSession = JSON.parse(transientSession);
-        if (isTokenExpired(parsedSession?.tokens?.accessToken)) {
-          clearStoredSession();
-          return { session: null };
-        }
-        return { session: parsedSession };
+    const transientSession = sessionStorage.getItem(STORAGE_KEY);
+    if (transientSession) {
+      const parsedSession = enrichSession(JSON.parse(transientSession));
+      if (isTokenExpired(parsedSession?.tokens?.accessToken)) {
+        clearStoredSession();
+        return { session: null, rememberMe: false };
       }
+      return { session: parsedSession, rememberMe: false };
+    }
   } catch (_error) {
     clearStoredSession();
   }
 
-  return { session: null };
+  return { session: null, rememberMe: false };
 }
 
 export function AuthProvider({ children }) {
-  const [session, setSession] = useState(() => readStoredSession().session);
+  const stored = readStoredSession();
+  const [session, setSession] = useState(() => stored.session);
+  const [rememberMe, setRememberMe] = useState(() => stored.rememberMe);
   const [isLoading, setIsLoading] = useState(false);
-  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(readStoredSession().session));
+  const [isBootstrapping, setIsBootstrapping] = useState(Boolean(stored.session));
 
   useEffect(() => {
     if (session) {
-      persistSession(session);
+      persistSessionWithPreference(session, rememberMe);
     } else {
       clearStoredSession();
     }
-  }, [session]);
+  }, [rememberMe, session]);
 
   useEffect(() => {
     const refreshSession = async () => {
@@ -87,7 +112,7 @@ export function AuthProvider({ children }) {
 
       try {
         const user = await authService.me();
-        setSession((currentSession) => (currentSession ? { ...currentSession, user: { ...currentSession.user, ...user } } : currentSession));
+        setSession((currentSession) => (currentSession ? enrichSession({ ...currentSession, user: { ...currentSession.user, ...user } }) : currentSession));
       } catch (_error) {
         setSession(null);
       } finally {
@@ -108,10 +133,14 @@ export function AuthProvider({ children }) {
     setIsLoading(true);
     try {
       const data = await authService.login(payload);
-      persistSession(data);
-      setSession(data);
+      const workspaceRole = deriveWorkspaceRole(data.user);
+      persistWorkspaceRole(workspaceRole);
+      const enrichedData = enrichSession(data);
+      setRememberMe(Boolean(payload.rememberMe));
+      persistSessionWithPreference(enrichedData, payload.rememberMe);
+      setSession(enrichedData);
       toast.success("Welcome back");
-      return data;
+      return enrichedData;
     } catch (error) {
       toast.error(getErrorMessage(error, "Login failed"));
       throw error;
@@ -124,10 +153,14 @@ export function AuthProvider({ children }) {
     setIsLoading(true);
     try {
       const data = await authService.register(payload);
-      persistSession(data);
-      setSession(data);
+      const workspaceRole = deriveWorkspaceRole(data.user);
+      persistWorkspaceRole(workspaceRole);
+      const enrichedData = enrichSession(data);
+      setRememberMe(true);
+      persistSession(enrichedData);
+      setSession(enrichedData);
       toast.success("Account created");
-      return data;
+      return enrichedData;
     } catch (error) {
       toast.error(getErrorMessage(error, "Registration failed"));
       throw error;
@@ -138,6 +171,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     clearStoredSession();
+    setRememberMe(false);
     setSession(null);
     toast.success("Signed out");
   };
@@ -146,8 +180,10 @@ export function AuthProvider({ children }) {
     () => ({
       session,
       user: session?.user ?? null,
+      role: session?.user?.workspaceRole || session?.user?.role || null,
       token: session?.tokens?.accessToken ?? null,
       isAuthenticated: Boolean(session?.tokens?.accessToken),
+      isLoggedIn: Boolean(session?.tokens?.accessToken),
       isLoading,
       isBootstrapping,
       login,

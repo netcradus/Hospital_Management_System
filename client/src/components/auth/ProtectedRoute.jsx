@@ -14,8 +14,8 @@ function ProtectedRoute({ children, allowedRoles }) {
     return <Navigate to="/auth/login" replace state={{ from: location }} />;
   }
 
-  if (allowedRoles?.length && !allowedRoles.includes(user?.role)) {
-    return <Navigate to={getDashboardPath(user?.role)} replace />;
+  if (allowedRoles?.length && !allowedRoles.includes(user?.workspaceRole || user?.role)) {
+    return <Navigate to={getDashboardPath(user?.workspaceRole || user?.role)} replace />;
   }
 
   return children;

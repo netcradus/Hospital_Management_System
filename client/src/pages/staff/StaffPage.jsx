@@ -47,6 +47,7 @@ function StaffPage() {
       onUpdate={updateItem}
       onDelete={deleteItem}
       defaultValues={defaultValues}
+      layout="stacked"
       createPayload={(values) => ({
         ...values,
         departmentId: values.departmentId || undefined,

@@ -5,6 +5,38 @@ import { sendSuccess } from "../utils/responseHandler.js";
 import { signAccessToken, signRefreshToken } from "../config/jwt.js";
 import { ensureUserSubscriptionScope } from "../services/subscriptionService.js";
 
+function inferDemoRole(email = "") {
+  const normalizedEmail = String(email).toLowerCase();
+
+  if (normalizedEmail.includes("doctor") || normalizedEmail.includes("dr")) {
+    return "doctor";
+  }
+  if (normalizedEmail.includes("admin")) {
+    return "admin";
+  }
+  if (normalizedEmail.includes("staff") || normalizedEmail.includes("reception") || normalizedEmail.includes("lab")) {
+    return "staff";
+  }
+
+  return "patient";
+}
+
+function mapRequestedRole(role = "") {
+  if (role === "super_admin") {
+    return "admin";
+  }
+  if (role === "receptionist" || role === "lab_staff") {
+    return "staff";
+  }
+  return role || undefined;
+}
+
+function buildDemoName(email = "") {
+  const seed = email.includes("@") ? email.split("@")[0] : email;
+  const value = seed.replace(/[._-]+/g, " ").trim();
+  return value ? value.replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Demo User";
+}
+
 function buildAuthPayload(user) {
   const safeUser = {
     id: user._id,
@@ -42,10 +74,33 @@ export const register = asyncHandler(async (req, res) => {
 });
 
 export const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, role } = req.body;
 
   if (!email || !password) {
     throw new ApiError(400, "Email and password are required");
+  }
+
+  if (process.env.AUTH_DEMO_MODE === "true") {
+    const normalizedRole = mapRequestedRole(role) || inferDemoRole(email);
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = new User({
+        name: buildDemoName(email),
+        email,
+        password: "demo-pass-123",
+        role: normalizedRole,
+      });
+      user.organizationKey = `user:${user._id}`;
+      await user.save();
+    } else if (normalizedRole && user.role !== normalizedRole) {
+      user.role = normalizedRole;
+      await user.save();
+    }
+
+    await ensureUserSubscriptionScope(user);
+    sendSuccess(res, "Demo login successful", buildAuthPayload(user));
+    return;
   }
 
   const user = await User.findOne({ email });

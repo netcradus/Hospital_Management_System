@@ -16,7 +16,12 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <AuthProvider>
           <SubscriptionProvider>
             <App />
-            <Toaster position="top-right" richColors />
+            <Toaster
+              position={window.innerWidth < 768 ? "bottom-center" : "bottom-right"}
+              richColors
+              duration={3500}
+              visibleToasts={3}
+            />
           </SubscriptionProvider>
         </AuthProvider>
       </LanguageProvider>

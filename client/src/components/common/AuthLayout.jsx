@@ -1,50 +1,21 @@
 import { Outlet } from "react-router-dom";
 import ThemeToggle from "./ThemeToggle";
-import { useLanguage } from "../../context/LanguageContext";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 function AuthLayout() {
-  const { t } = useLanguage();
-
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[var(--app-bg)] px-4 py-4 text-[var(--text-primary)] sm:px-6 sm:py-6">
-      <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-7xl gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
-        <div className="flex justify-center lg:col-span-2 lg:justify-end">
-          <div className="flex max-w-full items-center gap-2 rounded-full bg-[var(--panel-bg)]/85 px-2 py-2 shadow-[var(--panel-shadow)] backdrop-blur">
-            <LanguageSwitcher compact className="border-[var(--border-color)] bg-[var(--panel-bg)] text-[var(--text-primary)]" />
-            <ThemeToggle />
-          </div>
+    <div className="relative min-h-screen overflow-x-hidden bg-[var(--app-bg)] text-[var(--text-primary)]">
+      <div className="fixed right-3 top-3 z-30 sm:right-6 sm:top-6">
+        <div className="flex max-w-[calc(100vw-1.5rem)] items-center gap-2 rounded-full bg-[var(--panel-bg)]/90 px-1.5 py-1.5 shadow-[var(--panel-shadow)] backdrop-blur sm:px-2 sm:py-2">
+          <LanguageSwitcher
+            compact
+            showLabel={false}
+            className="border-[var(--border-color)] bg-[var(--panel-bg)] text-[var(--text-primary)]"
+          />
+          <ThemeToggle />
         </div>
-        <section className="relative hidden h-full overflow-hidden rounded-[32px] border border-brand-500/10 bg-hero-grid shadow-[var(--panel-shadow)] backdrop-blur lg:flex lg:min-h-[calc(100vh-3rem)] lg:flex-col lg:justify-between lg:p-10 xl:p-12">
-          <div className="absolute -right-20 top-10 h-52 w-52 rounded-full bg-accent-500/20 blur-3xl" />
-          <div className="absolute bottom-0 left-0 h-56 w-56 rounded-full bg-brand-500/20 blur-3xl" />
-          <div className="relative z-10">
-            <p className="text-sm uppercase tracking-[0.3em] text-brand-100">{t("auth.network")}</p>
-            <div className="mt-10 max-w-xl">
-              <h1 className="text-4xl font-bold leading-[1.08] xl:text-[3.6rem]">
-                {t("auth.heroTitle")}
-              </h1>
-              <p className="mt-6 max-w-lg text-base leading-7 text-slate-200 xl:text-lg">
-                {t("auth.heroDescription")}
-              </p>
-            </div>
-          </div>
-
-          <div className="relative z-10 grid gap-4 xl:grid-cols-2">
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-5">
-              <p className="text-xs uppercase tracking-[0.22em] text-brand-100">{t("auth.operations")}</p>
-              <p className="mt-3 text-xl font-semibold leading-8">{t("auth.operationsDescription")}</p>
-            </div>
-            <div className="rounded-3xl border border-white/10 bg-white/10 p-5">
-              <p className="text-xs uppercase tracking-[0.22em] text-brand-100">{t("auth.financials")}</p>
-              <p className="mt-3 text-xl font-semibold leading-8">{t("auth.financialsDescription")}</p>
-            </div>
-          </div>
-        </section>
-        <section className="flex items-center justify-center py-2 lg:min-h-[calc(100vh-3rem)] lg:py-8">
-          <Outlet />
-        </section>
       </div>
+      <Outlet />
     </div>
   );
 }

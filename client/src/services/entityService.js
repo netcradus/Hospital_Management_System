@@ -8,6 +8,19 @@ const responseCache = new Map();
 const inflightRequests = new Map();
 const DEFAULT_TTL = 2 * 60 * 1000;
 
+function isDemoModeActive() {
+  try {
+    const raw = localStorage.getItem("hms_demo_user");
+    if (!raw) {
+      return false;
+    }
+    const parsed = JSON.parse(raw);
+    return Boolean(parsed?.isLoggedIn);
+  } catch (_error) {
+    return false;
+  }
+}
+
 function buildCacheKey(resource, method, suffix = "") {
   return `${method}:${resource}:${suffix}`;
 }
@@ -85,6 +98,14 @@ export function createEntityService(resource) {
         const staleValue = responseCache.get(cacheKey)?.value;
         if (error.response?.status === 429 && staleValue) {
           return staleValue;
+        }
+        if (error.response?.status === 401 && isDemoModeActive()) {
+          return {
+            items: [],
+            total: 0,
+            page: 1,
+            limit: Number(params?.limit || 0),
+          };
         }
 
         throw error;

@@ -52,9 +52,9 @@ function CrudManagerPage({
   subtitle,
   description,
   resourceLabel,
-  fields,
-  columns,
-  items,
+  fields = [],
+  columns = [],
+  items = [],
   isLoading,
   isSubmitting,
   onCreate,
@@ -63,6 +63,7 @@ function CrudManagerPage({
   createPayload,
   editPayload,
   defaultValues,
+  layout = "stacked",
 }) {
   const { t } = useLanguage();
   const [editingItem, setEditingItem] = useState(null);
@@ -85,6 +86,8 @@ function CrudManagerPage({
     reset(defaultValues);
   }, [editingItem, reset, defaultValues, editPayload]);
 
+  const isStackedLayout = layout === "stacked";
+
   const handleSave = async (values) => {
     const payload = createPayload ? createPayload(values) : values;
 
@@ -103,8 +106,13 @@ function CrudManagerPage({
     actions: item,
   }));
 
+  const defaultColumns = fields.map((field) => ({
+    key: field.name,
+    label: field.label || field.name,
+  }));
+
   const tableColumns = [
-    ...columns,
+    ...((columns && columns.length) ? columns : defaultColumns),
     {
       key: "actions",
       label: t("crud.actions"),
@@ -130,7 +138,7 @@ function CrudManagerPage({
     <div className="space-y-5 sm:space-y-6">
       <PageHeader title={title} description={subtitle} eyebrow={t("crud.management", { resource: resourceLabel })} />
 
-      <section className="grid gap-6 2xl:grid-cols-[1.25fr_0.75fr]">
+      <section className={isStackedLayout ? "space-y-6" : "grid gap-6 2xl:grid-cols-[1.25fr_0.75fr]"}>
         <Card
           title={editingItem ? t("crud.editTitle", { resource: resourceLabel }) : t("crud.addTitle", { resource: resourceLabel })}
           subtitle={editingItem ? t("crud.editSubtitle") : t("crud.addSubtitle")}
