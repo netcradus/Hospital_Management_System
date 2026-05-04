@@ -134,8 +134,6 @@ function DashboardLayout() {
     return true;
   });
   const roleLabel = getWorkspaceRoleLabel(role);
-  const translatedRoleLabel = t(`role.${role}`);
-  const displayRoleLabel = translatedRoleLabel.startsWith("role.") ? roleLabel : translatedRoleLabel;
   const sidebarWidth = isSidebarCollapsed ? 104 : 288;
 
   useEffect(() => {
@@ -247,7 +245,7 @@ function DashboardLayout() {
                 className={`mt-4 flex min-h-[44px] items-center ${isSidebarCollapsed ? "justify-center" : "gap-2"} text-sm text-rose-100 transition hover:text-white`}
               >
                 <HiOutlineArrowRightOnRectangle />
-                {!isSidebarCollapsed ? t("brand.logout") : null}
+                {!isSidebarCollapsed ? "Logout" : null}
               </button>
             </div>
           </div>
@@ -265,10 +263,8 @@ function DashboardLayout() {
                 {isMobileSidebarOpen ? <HiOutlineXMark className="text-2xl" /> : <HiOutlineBars3 className="text-2xl" />}
               </button>
               <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)] sm:text-xs">
-                  {t("dashboard.workspaceTitle", { role: displayRoleLabel })}
-                </p>
-                <p className="hidden truncate text-sm text-[var(--text-muted)] md:block">{t("dashboard.workspaceDescription")}</p>
+                <p className="truncate text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)] sm:text-xs">{roleLabel} Workspace</p>
+                <p className="hidden truncate text-sm text-[var(--text-muted)] md:block">Live hospital operations with search, alerts, billing, and patient flow</p>
               </div>
             </div>
 
@@ -279,7 +275,7 @@ function DashboardLayout() {
                   type="search"
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
-                  placeholder={t("dashboard.searchPlaceholder")}
+                  placeholder="Search patients, doctors, appointments"
                   className="min-h-[46px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-muted)] pl-11 pr-4 text-sm outline-none"
                 />
                 {searchText.trim() ? (
@@ -288,9 +284,7 @@ function DashboardLayout() {
                       <div className="space-y-4 text-sm">
                         {groupedSearch.patients.length ? (
                           <div>
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)]">
-                              {t("search.patients")}
-                            </p>
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)]">Patients</p>
                             <div className="space-y-2">
                               {groupedSearch.patients.map((patient) => (
                                 <button
@@ -307,9 +301,7 @@ function DashboardLayout() {
                         ) : null}
                         {groupedSearch.doctors.length ? (
                           <div>
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)]">
-                              {t("search.doctors")}
-                            </p>
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)]">Doctors</p>
                             <div className="space-y-2">
                               {groupedSearch.doctors.map((doctor) => (
                                 <div key={doctor._id} className="rounded-2xl bg-[var(--panel-muted)] px-4 py-3">
@@ -322,9 +314,7 @@ function DashboardLayout() {
                         ) : null}
                         {groupedSearch.appointments.length ? (
                           <div>
-                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)]">
-                              {t("search.appointments")}
-                            </p>
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-dim)]">Appointments</p>
                             <div className="space-y-2">
                               {groupedSearch.appointments.map((appointment) => (
                                 <button
@@ -341,13 +331,13 @@ function DashboardLayout() {
                         ) : null}
                       </div>
                     ) : (
-                      <p className="text-sm text-[var(--text-muted)]">{t("search.noResults")}</p>
+                      <p className="text-sm text-[var(--text-muted)]">No results found for your search.</p>
                     )}
                   </div>
                 ) : null}
               </div>
               <LanguageSwitcher tone="light" compact showLabel={false} />
-              <Badge variant="info" className="hidden sm:inline-flex">{displayRoleLabel} Mode</Badge>
+              <Badge variant="info" className="hidden sm:inline-flex">{roleLabel} Mode</Badge>
               <ThemeToggle />
               <button
                 type="button"
@@ -391,13 +381,13 @@ function DashboardLayout() {
                   <div className="flex items-center gap-3">
                     <Avatar name={user?.name} />
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-white">{user?.name || t("brand.userFallback")}</p>
-                      <p className="text-sm text-slate-100/90">{displayRoleLabel}</p>
+                      <p className="truncate font-medium text-white">{user?.name || "User"}</p>
+                      <p className="text-sm text-slate-100/90">{roleLabel}</p>
                     </div>
                   </div>
                   <button type="button" onClick={logout} className="mt-4 flex items-center gap-2 text-sm text-rose-100 transition hover:text-white">
                     <HiOutlineArrowRightOnRectangle />
-                    {t("brand.logout")}
+                    Logout
                   </button>
                 </div>
               </div>
