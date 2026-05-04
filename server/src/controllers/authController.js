@@ -74,13 +74,15 @@ export const register = asyncHandler(async (req, res) => {
 });
 
 export const login = asyncHandler(async (req, res) => {
-  const { email, password, role } = req.body;
+  const { email, password, role, demoMode } = req.body;
 
   if (!email || !password) {
     throw new ApiError(400, "Email and password are required");
   }
 
-  if (process.env.AUTH_DEMO_MODE === "true") {
+  const shouldUseDemoMode = process.env.AUTH_DEMO_MODE === "true" || demoMode === true;
+
+  if (shouldUseDemoMode) {
     const normalizedRole = mapRequestedRole(role) || inferDemoRole(email);
     let user = await User.findOne({ email });
 

@@ -27,6 +27,7 @@ const authService = {
         email,
         password,
         role: apiRole,
+        demoMode: true,
       })
     );
 
