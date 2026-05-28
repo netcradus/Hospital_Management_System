@@ -22,14 +22,17 @@ const authService = {
           ? "staff"
           : requestedRole;
 
-    const data = await unwrap(
-      api.post("/auth/login", {
-        email,
-        password,
-        role: apiRole,
-        demoMode: true,
-      })
-    );
+    const requestBody = {
+      email,
+      password,
+      role: apiRole,
+    };
+
+    if (import.meta.env.VITE_AUTH_DEMO_MODE === "true") {
+      requestBody.demoMode = true;
+    }
+
+    const data = await unwrap(api.post("/auth/login", requestBody));
 
     return {
       ...data,

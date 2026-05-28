@@ -8,6 +8,24 @@ import errorHandler from "./middleware/errorHandler.js";
 
 const app = express();
 const shouldLogRequests = process.env.HTTP_LOGGING === "true";
+const defaultAllowedOrigins = ["http://localhost:5173", "https://hms.netcradus.tech"];
+const allowedOrigins = (process.env.CORS_ORIGIN || defaultAllowedOrigins.join(","))
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 250,
@@ -27,13 +45,8 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
 if (shouldLogRequests) {
