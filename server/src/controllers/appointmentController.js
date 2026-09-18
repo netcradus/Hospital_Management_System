@@ -23,6 +23,20 @@ async function getAuthenticatedPatient(req) {
   });
 }
 
+async function getAuthenticatedDoctorDoc(req) {
+  if (!req.user) return null;
+  const userRole = req.user.workspaceRole || req.user.role;
+  if (userRole !== "doctor") return null;
+
+  return await Doctor.findOne({
+    $or: [
+      { userId: req.user._id },
+      { email: String(req.user.email || "").toLowerCase() },
+      { _id: req.user._id },
+    ],
+  });
+}
+
 async function validateDoctorBelongsToDepartment(doctorId, departmentId, departmentName) {
   if (!doctorId) return;
 
@@ -108,6 +122,15 @@ export default {
         });
       }
       filter.patientId = patientDoc._id;
+    } else if (userRole === "doctor") {
+      const doctorDoc = await getAuthenticatedDoctorDoc(req);
+      if (!doctorDoc) {
+        return sendSuccess(res, "Appointments fetched successfully", {
+          items: [],
+          pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+        });
+      }
+      filter.doctorId = doctorDoc._id;
     }
 
     const page = Number(req.query.page || 1);
@@ -178,15 +201,23 @@ export default {
     const userRole = req.user?.workspaceRole || req.user?.role;
     let { patientId } = req.params;
 
+    const query = { patientId };
+
     if (userRole === "patient") {
       const patientDoc = await getAuthenticatedPatient(req);
       if (!patientDoc || String(patientDoc._id) !== String(patientId)) {
         throw new ApiError(403, "Access denied. You can only view your own appointments.");
       }
-      patientId = patientDoc._id;
+      query.patientId = patientDoc._id;
+    } else if (userRole === "doctor") {
+      const doctorDoc = await getAuthenticatedDoctorDoc(req);
+      if (!doctorDoc) {
+        throw new ApiError(403, "Access denied.");
+      }
+      query.doctorId = doctorDoc._id;
     }
 
-    const items = await Appointment.find({ patientId })
+    const items = await Appointment.find(query)
       .populate("patientId doctorId departmentId")
       .sort({ appointmentDate: -1, createdAt: -1 });
     sendSuccess(res, "Patient appointments fetched successfully", items);
@@ -204,6 +235,12 @@ export default {
       const itemPatientId = String(item.patientId?._id || item.patientId || "");
       if (!patientDoc || String(patientDoc._id) !== itemPatientId) {
         throw new ApiError(403, "Access denied.");
+      }
+    } else if (userRole === "doctor") {
+      const doctorDoc = await getAuthenticatedDoctorDoc(req);
+      const itemDoctorId = String(item.doctorId?._id || item.doctorId || "");
+      if (!doctorDoc || String(doctorDoc._id) !== itemDoctorId) {
+        throw new ApiError(403, "Access denied. You can only view your own appointments.");
       }
     }
 
@@ -232,7 +269,6 @@ export default {
 
     const item = await Appointment.create(appointmentData);
 
-    // Concurrency validation check after save
     const targetDate = new Date(appointmentDate);
     const startDate = new Date(targetDate);
     startDate.setUTCHours(0, 0, 0, 0);
@@ -270,6 +306,13 @@ export default {
       if (!patientDoc || String(patientDoc._id) !== existingPatientId) {
         throw new ApiError(403, "Access denied. You can only update your own appointments.");
       }
+    } else if (userRole === "doctor") {
+      const doctorDoc = await getAuthenticatedDoctorDoc(req);
+      const existingDoctorId = String(existing.doctorId?._id || existing.doctorId || "");
+      if (!doctorDoc || String(doctorDoc._id) !== existingDoctorId) {
+        throw new ApiError(403, "Access denied. You can only update your own appointments.");
+      }
+      req.body.doctorId = existing.doctorId;
     }
 
     const targetDoctor = doctorId || existing.doctorId;
@@ -306,11 +349,18 @@ export default {
       if (!patientDoc || String(patientDoc._id) !== existingPatientId) {
         throw new ApiError(403, "Access denied.");
       }
+    } else if (userRole === "doctor") {
+      const doctorDoc = await getAuthenticatedDoctorDoc(req);
+      const existingDoctorId = String(existing.doctorId?._id || existing.doctorId || "");
+      if (!doctorDoc || String(doctorDoc._id) !== existingDoctorId) {
+        throw new ApiError(403, "Access denied.");
+      }
     }
 
     await Appointment.findByIdAndDelete(req.params.id);
     sendSuccess(res, "Appointment deleted successfully", existing);
   }),
 };
+
 
 
