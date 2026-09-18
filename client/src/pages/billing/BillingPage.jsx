@@ -161,7 +161,6 @@ function BillingPage() {
       setForm((current) => ({
         ...current,
         patientId: current.patientId || patientResponse.items[0]?._id || "",
-        doctorId: current.doctorId || doctorResponse.items[0]?._id || "",
       }));
     } finally {
       setIsLoading(false);
@@ -171,6 +170,105 @@ function BillingPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  const patientAppointments = useMemo(() => {
+    if (!form.patientId) return [];
+    return appointments.filter((appt) => {
+      const pid = String(appt.patientId?._id || appt.patientId || "");
+      return pid === String(form.patientId);
+    });
+  }, [appointments, form.patientId]);
+
+  const primaryAppointment = useMemo(() => {
+    if (!patientAppointments.length) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const active = patientAppointments
+      .filter((a) => {
+        const d = new Date(a.appointmentDate);
+        return d >= today && a.status !== "Cancelled";
+      })
+      .sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
+
+    if (active.length > 0) return active[0];
+
+    const sorted = [...patientAppointments].sort(
+      (a, b) => new Date(b.appointmentDate || b.createdAt) - new Date(a.appointmentDate || a.createdAt)
+    );
+    return sorted[0];
+  }, [patientAppointments]);
+
+  useEffect(() => {
+    if (!form.patientId) {
+      setForm((prev) => ({ ...prev, appointmentId: "", doctorId: "" }));
+      return;
+    }
+    const existsInList = patientAppointments.some(
+      (a) => String(a._id) === String(form.appointmentId)
+    );
+    if (!existsInList) {
+      if (primaryAppointment) {
+        const docId = String(primaryAppointment.doctorId?._id || primaryAppointment.doctorId || "");
+        setForm((prev) => ({
+          ...prev,
+          appointmentId: primaryAppointment._id,
+          doctorId: docId,
+        }));
+      } else {
+        setForm((prev) => ({ ...prev, appointmentId: "", doctorId: "" }));
+      }
+    }
+  }, [form.patientId, patientAppointments, primaryAppointment, form.appointmentId]);
+
+  const activeAppointment = useMemo(() => {
+    if (!form.appointmentId) return null;
+    return patientAppointments.find((a) => String(a._id) === String(form.appointmentId)) || null;
+  }, [patientAppointments, form.appointmentId]);
+
+  const activeAppointmentId = useMemo(() => {
+    if (!activeAppointment) return "";
+    return activeAppointment.appointmentId || activeAppointment._id.slice(-6);
+  }, [activeAppointment]);
+
+  const activeDoctorName = useMemo(() => {
+    if (!activeAppointment) return "Unassigned";
+    const docObj =
+      typeof activeAppointment.doctorId === "object"
+        ? activeAppointment.doctorId
+        : doctors.find((d) => String(d._id) === String(activeAppointment.doctorId));
+    if (docObj) {
+      return `Dr. ${docObj.firstName || ""} ${docObj.lastName || ""}`.trim();
+    }
+    return "Unassigned";
+  }, [activeAppointment, doctors]);
+
+  const activeDepartmentName = useMemo(() => {
+    if (!activeAppointment) return "N/A";
+    if (activeAppointment.department) return activeAppointment.department;
+    if (typeof activeAppointment.departmentId === "object" && activeAppointment.departmentId?.name) {
+      return activeAppointment.departmentId.name;
+    }
+    if (typeof activeAppointment.doctorId === "object") {
+      if (activeAppointment.doctorId.departmentId?.name) return activeAppointment.doctorId.departmentId.name;
+      if (activeAppointment.doctorId.specialization) return activeAppointment.doctorId.specialization;
+    }
+    return "General";
+  }, [activeAppointment]);
+
+  const activeAppointmentDateLabel = useMemo(() => {
+    if (!activeAppointment?.appointmentDate) return "N/A";
+    return new Date(activeAppointment.appointmentDate).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  }, [activeAppointment]);
+
+  const activeAppointmentTimeLabel = useMemo(() => {
+    if (!activeAppointment?.appointmentTime) return "N/A";
+    return activeAppointment.appointmentTime;
+  }, [activeAppointment]);
 
   const currentTotals = useMemo(() => {
     const subtotal = form.lineItems.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
@@ -281,7 +379,7 @@ function BillingPage() {
       });
       saveInvoiceNotification(created, user);
       toast.success("Invoice created");
-      setForm({ patientId: patients[0]?._id || "", doctorId: doctors[0]?._id || "", appointmentId: "", paymentMethod: "Cash", status: "Draft", lineItems: [newLineItem()] });
+      setForm({ patientId: patients[0]?._id || "", doctorId: "", appointmentId: "", paymentMethod: "Cash", status: "Draft", lineItems: [newLineItem()] });
       await loadData();
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to create invoice");
@@ -311,30 +409,104 @@ function BillingPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="text-sm">
                   <span className="mb-2 block text-[var(--field-label)]">Patient</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={form.patientId} onChange={(event) => setForm((current) => ({ ...current, patientId: event.target.value }))}>
-                    {patients.map((patient) => <option key={patient._id} value={patient._id}>{patient.firstName} {patient.lastName}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm">
-                  <span className="mb-2 block text-[var(--field-label)]">Doctor</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={form.doctorId} onChange={(event) => setForm((current) => ({ ...current, doctorId: event.target.value }))}>
-                    {doctors.map((doctor) => <option key={doctor._id} value={doctor._id}>Dr. {doctor.firstName} {doctor.lastName}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm">
-                  <span className="mb-2 block text-[var(--field-label)]">Appointment</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={form.appointmentId} onChange={(event) => setForm((current) => ({ ...current, appointmentId: event.target.value }))}>
-                    <option value="">Select appointment</option>
-                    {appointments.map((appointment) => <option key={appointment._id} value={appointment._id}>{new Date(appointment.appointmentDate).toLocaleDateString("en-IN")} • {appointment.appointmentTime}</option>)}
+                  <select
+                    className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4"
+                    value={form.patientId}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        patientId: event.target.value,
+                        appointmentId: "",
+                        doctorId: "",
+                      }))
+                    }
+                  >
+                    <option value="">Select Patient</option>
+                    {patients.map((patient) => (
+                      <option key={patient._id} value={patient._id}>
+                        {patient.firstName} {patient.lastName} {patient.patientId ? `(${patient.patientId})` : ""}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <label className="text-sm">
                   <span className="mb-2 block text-[var(--field-label)]">Payment Method</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={form.paymentMethod} onChange={(event) => setForm((current) => ({ ...current, paymentMethod: event.target.value }))}>
-                    {paymentMethods.map((method) => <option key={method}>{method}</option>)}
+                  <select
+                    className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4"
+                    value={form.paymentMethod}
+                    onChange={(event) => setForm((current) => ({ ...current, paymentMethod: event.target.value }))}
+                  >
+                    {paymentMethods.map((method) => (
+                      <option key={method}>{method}</option>
+                    ))}
                   </select>
                 </label>
               </div>
+
+              {form.patientId ? (
+                patientAppointments.length > 0 ? (
+                  <div className="space-y-3 rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-color)]/70 pb-3">
+                      <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+                        Appointment Information (Auto-Populated)
+                      </span>
+                      {patientAppointments.length > 1 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--text-muted)]">Select Appointment:</span>
+                          <select
+                            className="min-h-[36px] rounded-xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-3 text-xs font-medium"
+                            value={form.appointmentId}
+                            onChange={(e) => {
+                              const sel = patientAppointments.find((a) => String(a._id) === String(e.target.value));
+                              const dId = sel ? String(sel.doctorId?._id || sel.doctorId || "") : "";
+                              setForm((prev) => ({ ...prev, appointmentId: e.target.value, doctorId: dId }));
+                            }}
+                          >
+                            {patientAppointments.map((a) => {
+                              const displayId = a.appointmentId || a._id.slice(-6);
+                              const apptDateStr = a.appointmentDate
+                                ? new Date(a.appointmentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                                : "";
+                              return (
+                                <option key={a._id} value={a._id}>
+                                  {displayId} • {apptDateStr} ({a.appointmentTime})
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-5">
+                      <div className="rounded-xl border border-[var(--border-color)]/50 bg-[var(--panel-bg)] p-3">
+                        <span className="block text-xs text-[var(--text-muted)]">Appointment ID</span>
+                        <span className="mt-1 block font-semibold text-brand-600">{activeAppointmentId}</span>
+                      </div>
+                      <div className="rounded-xl border border-[var(--border-color)]/50 bg-[var(--panel-bg)] p-3">
+                        <span className="block text-xs text-[var(--text-muted)]">Doctor</span>
+                        <span className="mt-1 block font-semibold">{activeDoctorName}</span>
+                      </div>
+                      <div className="rounded-xl border border-[var(--border-color)]/50 bg-[var(--panel-bg)] p-3">
+                        <span className="block text-xs text-[var(--text-muted)]">Department</span>
+                        <span className="mt-1 block font-semibold">{activeDepartmentName}</span>
+                      </div>
+                      <div className="rounded-xl border border-[var(--border-color)]/50 bg-[var(--panel-bg)] p-3">
+                        <span className="block text-xs text-[var(--text-muted)]">Appointment Date</span>
+                        <span className="mt-1 block font-medium">{activeAppointmentDateLabel}</span>
+                      </div>
+                      <div className="rounded-xl border border-[var(--border-color)]/50 bg-[var(--panel-bg)] p-3">
+                        <span className="block text-xs text-[var(--text-muted)]">Appointment Time</span>
+                        <span className="mt-1 block font-medium">{activeAppointmentTimeLabel}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-[20px] border border-amber-500/30 bg-amber-500/10 p-4 text-sm font-medium text-amber-700">
+                    No appointment found for this patient.
+                  </div>
+                )
+              ) : null}
 
               <div className="space-y-3">
                 {form.lineItems.map((item, index) => (

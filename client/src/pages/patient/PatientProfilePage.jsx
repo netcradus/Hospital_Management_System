@@ -210,7 +210,7 @@ function PatientProfilePage() {
         name: `${data.patient.firstName} ${data.patient.lastName}`,
         age,
         gender: data.patient.gender,
-        patientCode: data.supplement.patientCode || data.patient._id,
+        patientCode: data.patient.patientId || data.supplement.patientCode || data.patient._id,
       },
       prescription,
       diagnosis,
@@ -319,11 +319,11 @@ function PatientProfilePage() {
             <Badge variant={data.patient.status === "Active" ? "success" : "danger"}>{data.patient.status}</Badge>
             <div className="rounded-[22px] bg-[var(--panel-muted)] px-4 py-3 text-sm text-[var(--text-muted)]">
               Patient ID:{" "}
-              <span className="font-mono tracking-wider text-[var(--text-dim)]">{data.supplement.patientCode || data.patient._id}</span>
+              <span className="font-mono tracking-wider text-[var(--text-dim)]">{data.patient.patientId || data.supplement.patientCode || data.patient._id}</span>
               <button
                 type="button"
                 className="ml-2 text-xs text-[var(--teal)]"
-                onClick={() => navigator.clipboard?.writeText(String(data.supplement.patientCode || data.patient._id))}
+                onClick={() => navigator.clipboard?.writeText(String(data.patient.patientId || data.supplement.patientCode || data.patient._id))}
               >
                 Copy
               </button>

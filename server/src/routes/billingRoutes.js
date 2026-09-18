@@ -7,6 +7,7 @@ const router = Router();
 router.get("/", requirePermission("billing", "view"), controller.list);
 router.post("/", requirePermission("billing", "create"), controller.create);
 router.get("/:id", requirePermission("billing", "view"), controller.getById);
+router.post("/:id/pay", requirePermission("billing", "view"), controller.processPayment);
 router.put("/:id", requirePermission("billing", "edit"), controller.update);
 router.delete("/:id", requirePermission("billing", "delete"), controller.remove);
 

@@ -10,6 +10,8 @@ const billingSchema = new mongoose.Schema(
     tax: { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
     totalAmount: { type: Number, required: true },
+    amountPaid: { type: Number, default: 0 },
+    amountDue: { type: Number, default: 0 },
     paymentStatus: {
       type: String,
       enum: ["Paid", "Pending", "Partially Paid"],
@@ -17,6 +19,7 @@ const billingSchema = new mongoose.Schema(
     },
     paymentDate: Date,
     paymentMethod: String,
+    transactionId: String,
     invoiceNumber: { type: String, unique: true, sparse: true },
     notes: String,
   },

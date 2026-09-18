@@ -1,17 +1,23 @@
 import app from "./src/app.js";
 import connectDatabase from "./src/config/database.js";
+import { syncExistingPatientIds } from "./src/models/Patient.js";
+import { syncExistingAppointmentIds } from "./src/models/Appointment.js";
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 const startServer = async () => {
   await connectDatabase();
+  await syncExistingPatientIds();
+  await syncExistingAppointmentIds();
   const server = app.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
   });
 
   server.on("error", (error) => {
-    if (error.code === "EADDRINUSE") {
-      console.error(`Port ${PORT} is already in use. Stop the existing server or change PORT in server/.env.`);
+    if (error.code === "EADDRINUSE" || error.code === "EACCES") {
+      console.error(
+        `Port ${PORT} failed to listen (${error.code}: ${error.message}). Please change PORT in server/.env to an open port (e.g. 5001 or 5005).`
+      );
       process.exit(1);
     }
 

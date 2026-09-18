@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { HiOutlineArrowDownTray, HiOutlineBell, HiOutlineCalendarDays, HiOutlineClipboardDocumentList, HiOutlineCreditCard, HiOutlineBeaker } from "react-icons/hi2";
 import Badge from "../../components/common/Badge";
 import Button from "../../components/common/Button";
@@ -25,6 +26,7 @@ const hospitalProfile = {
 };
 
 function PatientDashboardPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { language } = useLanguage();
   const copy = language === "hi"
@@ -88,10 +90,25 @@ function PatientDashboardPage() {
   });
 
   const nextAppointment = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
     return (data?.appointments || [])
-      .filter((item) => new Date(item.appointmentDate) >= new Date())
+      .filter((item) => item.status !== "Cancelled" && item.status !== "Completed" && new Date(item.appointmentDate) >= now)
       .sort((left, right) => new Date(left.appointmentDate) - new Date(right.appointmentDate))[0];
   }, [data?.appointments]);
+
+  const nextAppointmentDoctor = useMemo(() => {
+    if (!nextAppointment) return "";
+    const docId = String(nextAppointment.doctorId?._id || nextAppointment.doctorId || "");
+    const doctorObj = (data?.doctors || []).find((d) => String(d._id) === docId);
+    if (doctorObj) {
+      return `${doctorObj.firstName} ${doctorObj.lastName}`;
+    }
+    if (nextAppointment.doctorId?.firstName) {
+      return `${nextAppointment.doctorId.firstName} ${nextAppointment.doctorId.lastName}`;
+    }
+    return "Doctor";
+  }, [nextAppointment, data?.doctors]);
 
   const pendingInvoices = (data?.billing || []).filter((item) => item.paymentStatus !== "Paid");
   const recentTests = (data?.supplement?.tests || []).slice(0, 4);
@@ -116,7 +133,7 @@ function PatientDashboardPage() {
         name: `${data.patientProfile.firstName} ${data.patientProfile.lastName}`,
         age: "-",
         gender: data.patientProfile.gender,
-        patientCode: data.supplement.patientCode || data.patientProfile._id,
+        patientCode: data.patientProfile.patientId || data.supplement.patientCode || data.patientProfile._id,
       },
       prescription: lastPrescription,
       diagnosis: data.supplement.diagnoses.find((item) => item.id === lastPrescription.diagnosisId),
@@ -132,19 +149,29 @@ function PatientDashboardPage() {
       />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={HiOutlineCalendarDays} label={copy.nextAppointment} value={nextAppointment ? new Date(nextAppointment.appointmentDate).toLocaleDateString("en-IN") : "Not scheduled"} helper={nextAppointment?.appointmentTime || "Book when ready"} isLoading={isLoading} />
+        <StatCard icon={HiOutlineCalendarDays} label={copy.nextAppointment} value={nextAppointment ? new Date(nextAppointment.appointmentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "Not scheduled"} helper={nextAppointment?.appointmentTime || "Book when ready"} isLoading={isLoading} />
         <StatCard icon={HiOutlineClipboardDocumentList} label={copy.activePrescriptions} value={activePrescriptions.length} helper="Current medications" isLoading={isLoading} />
         <StatCard icon={HiOutlineBeaker} label={copy.recentTests} value={recentTests.length} helper="Latest lab updates" isLoading={isLoading} />
         <StatCard icon={HiOutlineCreditCard} label={copy.pendingInvoices} value={pendingInvoices.length} helper="Awaiting payment" isLoading={isLoading} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
-        <Card title="Next Appointment" subtitle="Prominent upcoming visit summary">
+        <Card title="Upcoming Appointment" subtitle="Your next scheduled doctor consultation">
           {nextAppointment ? (
-            <div className="rounded-[28px] bg-gradient-to-r from-[rgba(26,188,156,0.12)] to-[rgba(41,128,232,0.08)] p-5">
-              <p className="text-lg font-semibold">{new Date(nextAppointment.appointmentDate).toLocaleDateString("en-IN")} • {nextAppointment.appointmentTime}</p>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">{nextAppointment.reasonForVisit || "Scheduled consultation"}</p>
-              <p className="mt-2 text-sm text-[var(--text-muted)]">Status: {nextAppointment.status}</p>
+            <div className="rounded-[28px] border border-[var(--border-color)] bg-gradient-to-r from-[rgba(26,188,156,0.12)] to-[rgba(41,128,232,0.08)] p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-brand-600">Upcoming Appointment Notification</p>
+              <p className="mt-2 text-base font-semibold text-[var(--text-primary)]">
+                Your appointment with Dr. {nextAppointmentDoctor} is scheduled for{" "}
+                <span className="font-bold text-brand-700">
+                  {new Date(nextAppointment.appointmentDate).toLocaleDateString("en-IN", { day: "2-digit", month: "long", year: "numeric" })}
+                </span>{" "}
+                at <span className="font-bold text-brand-700">{nextAppointment.appointmentTime}</span>.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-color)]/60 pt-3 text-xs text-[var(--text-muted)]">
+                <span>Appointment ID: <strong className="font-mono text-[var(--text-primary)]">{nextAppointment.appointmentId || nextAppointment._id}</strong></span>
+                <span>Reason: {nextAppointment.reasonForVisit || "Consultation"}</span>
+                <span>Status: <Badge variant="success">{nextAppointment.status}</Badge></span>
+              </div>
             </div>
           ) : (
             <EmptyState title="No upcoming appointment" description="Your next appointment will appear here once scheduled." />
@@ -196,6 +223,38 @@ function PatientDashboardPage() {
               </div>
             )) : <EmptyState title="No test results" description="Completed lab results will show here." />}
           </div>
+        </Card>
+
+        <Card title="Billing & Payment Due" subtitle="Outstanding medical bills summary">
+          {pendingInvoices.length > 0 ? (
+            <div className="space-y-4">
+              <div className="rounded-[24px] border border-rose-200 bg-rose-50/60 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-700">Payment Due</span>
+                  <Badge variant="danger">Pending</Badge>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between">
+                  <span className="text-2xl font-extrabold text-rose-600">
+                    {new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(
+                      pendingInvoices.reduce((sum, item) => sum + Math.max(0, Number(item.totalAmount || item.amount || 0) - Number(item.amountPaid || 0)), 0)
+                    )}
+                  </span>
+                  <span className="font-mono text-xs font-semibold text-[var(--text-muted)]">
+                    {pendingInvoices[0].invoiceNumber || pendingInvoices[0]._id.slice(-6)}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  Doctor: Dr. {pendingInvoices[0].doctorId?.firstName || "Consultant"} &bull; {pendingInvoices[0].serviceDescription || "Medical Consultation"}
+                </p>
+              </div>
+              <Button type="button" className="w-full" onClick={() => navigate("/patient/billing")}>
+                <HiOutlineCreditCard className="mr-2 text-base" />
+                Pay Now
+              </Button>
+            </div>
+          ) : (
+            <EmptyState title="No Pending Payment" description="All your medical invoices are fully paid and settled." />
+          )}
         </Card>
 
         <Card title="Notification Center" subtitle="Latest in-app reminders and medical updates">

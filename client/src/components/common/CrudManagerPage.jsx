@@ -14,6 +14,11 @@ function renderField(field, register, errors) {
   const commonProps = {
     label: field.label,
     error: errors[field.name]?.message,
+    maxLength: field.maxLength,
+    min: field.min,
+    max: field.max,
+    onInput: field.onInput,
+    placeholder: field.placeholder,
   };
 
   if (field.type === "select") {
@@ -30,7 +35,6 @@ function renderField(field, register, errors) {
     return (
       <TextAreaField
         {...commonProps}
-        placeholder={field.placeholder}
         {...register(field.name, field.rules)}
       />
     );
@@ -40,7 +44,6 @@ function renderField(field, register, errors) {
     <InputField
       {...commonProps}
       type={field.type || "text"}
-      placeholder={field.placeholder}
       step={field.step}
       {...register(field.name, field.rules)}
     />
@@ -75,6 +78,7 @@ function CrudManagerPage({
     formState: { errors },
   } = useForm({
     defaultValues,
+    mode: "onTouched",
   });
 
   useEffect(() => {

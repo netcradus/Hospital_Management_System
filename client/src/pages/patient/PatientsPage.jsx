@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import Badge from "../../components/common/Badge";
@@ -7,12 +8,17 @@ import Card from "../../components/common/Card";
 import EmptyState from "../../components/common/EmptyState";
 import InputField from "../../components/common/InputField";
 import PageHeader from "../../components/common/PageHeader";
+import SelectField from "../../components/common/SelectField";
 import { useLanguage } from "../../context/LanguageContext";
 import useAuth from "../../hooks/useAuth";
 import { createEntityService } from "../../services/entityService";
 import { ensureSupplementData, getPatientSupplement } from "../../services/hmsSupplementService";
 
+import { canAccess } from "../../config/rbac";
+
 const patientService = createEntityService("patients");
+
+const VALID_BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
 const defaultForm = {
   firstName: "",
@@ -40,13 +46,24 @@ function PatientsPage() {
   const { language } = useLanguage();
   const role = user?.workspaceRole || user?.role;
   const basePath = role === "doctor" ? "/doctor/patients" : role === "patient" ? "/patient/patients" : "/staff/patients";
-  const tableBasePath = role === "super_admin" ? "/admin/patients" : basePath;
-  const canRegister = role === "super_admin" || role === "receptionist";
+  const tableBasePath = role === "super_admin" || role === "admin" ? "/admin/patients" : basePath;
+  const canRegister = canAccess(role, "patients", "create");
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [form, setForm] = useState(defaultForm);
   const [query, setQuery] = useState("");
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    defaultValues: defaultForm,
+    mode: "onTouched",
+  });
 
   const loadPatients = async () => {
     setIsLoading(true);
@@ -70,43 +87,60 @@ function PatientsPage() {
     }
 
     return items.filter((patient) =>
-      `${patient.firstName} ${patient.lastName} ${patient.email || ""} ${patient.phone || ""}`.toLowerCase().includes(normalized)
+      `${patient.firstName} ${patient.lastName} ${patient.patientId || ""} ${patient.email || ""} ${patient.phone || ""}`.toLowerCase().includes(normalized)
     );
   }, [items, query]);
 
-  const handleCreate = async (event) => {
-    event.preventDefault();
+  const handleCreate = async (values) => {
     setIsSubmitting(true);
     try {
+      const trimmedFirstName = values.firstName.trim();
+      const trimmedLastName = values.lastName ? values.lastName.trim() : "";
+      const trimmedEmail = values.email.trim();
+      const trimmedPhone = values.phone.trim();
+      const trimmedAddress = values.address.trim();
+      const trimmedCity = values.city.trim();
+      const trimmedState = values.state.trim();
+      const trimmedZipCode = values.zipCode.trim();
+      const trimmedBloodType = values.bloodType ? values.bloodType.trim().toUpperCase() : undefined;
+      const trimmedEmergencyName = values.emergencyName.trim();
+      const trimmedEmergencyPhone = values.emergencyPhone.trim();
+      const trimmedEmergencyRelationship = values.emergencyRelationship?.trim();
+      const trimmedInsuranceProvider = values.insuranceProvider?.trim();
+      const trimmedInsurancePolicyNumber = values.insurancePolicyNumber?.trim();
+      const parsedAllergies = values.allergies
+        ? values.allergies
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean)
+        : [];
+
       await patientService.create({
-        firstName: form.firstName,
-        lastName: form.lastName,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
-        gender: form.gender,
-        bloodType: form.bloodType || undefined,
-        dob: form.dob || undefined,
-        address: form.address || undefined,
-        city: form.city || undefined,
-        state: form.state || undefined,
-        zipCode: form.zipCode || undefined,
-        status: form.status,
-        allergies: form.allergies
-          .split(",")
-          .map((item) => item.trim())
-          .filter(Boolean),
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        email: trimmedEmail,
+        phone: trimmedPhone,
+        gender: values.gender,
+        bloodType: trimmedBloodType || undefined,
+        dob: values.dob,
+        address: trimmedAddress,
+        city: trimmedCity,
+        state: trimmedState,
+        zipCode: trimmedZipCode,
+        status: values.status,
+        allergies: parsedAllergies,
         emergencyContact: {
-          name: form.emergencyName || undefined,
-          phone: form.emergencyPhone || undefined,
-          relationship: form.emergencyRelationship || undefined,
+          name: trimmedEmergencyName,
+          phone: trimmedEmergencyPhone,
+          relationship: trimmedEmergencyRelationship || undefined,
         },
         insurance: {
-          provider: form.insuranceProvider || undefined,
-          policyNumber: form.insurancePolicyNumber || undefined,
+          provider: trimmedInsuranceProvider || undefined,
+          policyNumber: trimmedInsurancePolicyNumber || undefined,
         },
       });
       toast.success("Patient registered");
-      setForm(defaultForm);
+      reset(defaultForm);
       await loadPatients();
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to register patient");
@@ -205,45 +239,235 @@ function PatientsPage() {
       <section className={sectionClassName}>
         {canRegister ? (
           <Card title={copy.registrationTitle} subtitle={copy.registrationSubtitle}>
-            <form className="space-y-4" onSubmit={handleCreate}>
+            <form className="space-y-4" onSubmit={handleSubmit(handleCreate)} noValidate>
               <div className="grid gap-4 md:grid-cols-2">
-                <InputField label={copy.firstName} value={form.firstName} onChange={(event) => setForm((current) => ({ ...current, firstName: event.target.value }))} />
-                <InputField label={copy.lastName} value={form.lastName} onChange={(event) => setForm((current) => ({ ...current, lastName: event.target.value }))} />
-                <InputField label={copy.email} type="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} />
-                <InputField label={copy.phone} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />
-                <label className="text-sm">
-                  <span className="mb-2 block text-[var(--field-label)]">{copy.gender}</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={form.gender} onChange={(event) => setForm((current) => ({ ...current, gender: event.target.value }))}>
-                    {["Male", "Female", "Other"].map((item) => <option key={item}>{item}</option>)}
-                  </select>
-                </label>
-                <InputField label={copy.bloodGroup} value={form.bloodType} onChange={(event) => setForm((current) => ({ ...current, bloodType: event.target.value }))} />
+                <InputField
+                  label={copy.firstName}
+                  error={errors.firstName?.message}
+                  maxLength={50}
+                  {...register("firstName", {
+                    required: "First Name is required",
+                    maxLength: { value: 50, message: "First Name cannot exceed 50 characters" },
+                    validate: {
+                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "First Name must be at least 2 characters",
+                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "First Name can only contain letters and spaces",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.lastName}
+                  error={errors.lastName?.message}
+                  maxLength={50}
+                  {...register("lastName", {
+                    maxLength: { value: 50, message: "Last Name cannot exceed 50 characters" },
+                    validate: {
+                      minLengthIfProvided: (val) =>
+                        !val || !val.trim() || val.trim().length >= 2 || "Last Name must be at least 2 characters",
+                      onlyAlphaSpace: (val) =>
+                        !val || !val.trim() || /^[A-Za-z\s]+$/.test(val.trim()) || "Last Name can only contain letters and spaces",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.email}
+                  type="email"
+                  error={errors.email?.message}
+                  maxLength={100}
+                  {...register("email", {
+                    required: "Email is required",
+                    maxLength: { value: 100, message: "Email cannot exceed 100 characters" },
+                    pattern: {
+                      value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                      message: "Please enter a valid email address",
+                    },
+                    validate: {
+                      notEmpty: (val) => (val && val.trim().length > 0) || "Email is required",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.phone}
+                  error={errors.phone?.message}
+                  maxLength={10}
+                  onInput={(e) => {
+                    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  }}
+                  {...register("phone", {
+                    required: "Phone number is required",
+                    maxLength: { value: 10, message: "Phone number must be exactly 10 digits" },
+                    pattern: {
+                      value: /^[6-9]\d{9}$/,
+                      message: "Phone number must be a valid 10-digit number starting with 6, 7, 8, or 9",
+                    },
+                  })}
+                />
+                <SelectField
+                  label={copy.gender}
+                  options={["Male", "Female", "Other"]}
+                  error={errors.gender?.message}
+                  {...register("gender", {
+                    required: "Gender is required",
+                    validate: (val) => ["Male", "Female", "Other"].includes(val) || "Please select a valid gender",
+                  })}
+                />
+                <InputField
+                  label={copy.bloodGroup}
+                  error={errors.bloodType?.message}
+                  maxLength={3}
+                  placeholder="e.g. O+, A+, B-"
+                  {...register("bloodType", {
+                    maxLength: { value: 3, message: "Blood Group cannot exceed 3 characters" },
+                    validate: (val) => {
+                      if (!val || !val.trim()) return true;
+                      return (
+                        VALID_BLOOD_GROUPS.includes(val.trim().toUpperCase()) ||
+                        "Invalid blood group (Allowed: A+, A-, B+, B-, AB+, AB-, O+, O-)"
+                      );
+                    },
+                  })}
+                />
                 <InputField
                   label={copy.dob}
                   type="date"
-                  min="1920-01-01"
-                  max={new Date().toISOString().split("T")[0]}
-                  value={form.dob}
-                  onChange={(event) => setForm((current) => ({ ...current, dob: event.target.value }))}
+                  min="1900-01-01"
+                  max={todayStr}
+                  error={errors.dob?.message}
+                  {...register("dob", {
+                    required: "Date of Birth is required",
+                    validate: {
+                      validDate: (val) => !isNaN(Date.parse(val)) || "Please enter a valid date",
+                      noFuture: (val) => new Date(val) <= new Date() || "Date of Birth cannot be in the future",
+                    },
+                  })}
                 />
-                <label className="text-sm">
-                  <span className="mb-2 block text-[var(--field-label)]">{copy.status}</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={form.status} onChange={(event) => setForm((current) => ({ ...current, status: event.target.value }))}>
-                    {["Active", "Inactive"].map((item) => <option key={item}>{item}</option>)}
-                  </select>
-                </label>
+                <SelectField
+                  label={copy.status}
+                  options={["Active", "Inactive"]}
+                  error={errors.status?.message}
+                  {...register("status", {
+                    required: "Status is required",
+                    validate: (val) => ["Active", "Inactive"].includes(val) || "Please select a valid status",
+                  })}
+                />
                 <div className="md:col-span-2">
-                  <InputField label={copy.address} value={form.address} onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))} />
+                  <InputField
+                    label={copy.address}
+                    error={errors.address?.message}
+                    maxLength={200}
+                    {...register("address", {
+                      required: "Address is required",
+                      maxLength: { value: 200, message: "Address cannot exceed 200 characters" },
+                      validate: {
+                        noWhitespaceOnly: (val) => (val && val.trim().length >= 5) || "Address must be at least 5 characters long",
+                      },
+                    })}
+                  />
                 </div>
-                <InputField label={copy.city} value={form.city} onChange={(event) => setForm((current) => ({ ...current, city: event.target.value }))} />
-                <InputField label={copy.state} value={form.state} onChange={(event) => setForm((current) => ({ ...current, state: event.target.value }))} />
-                <InputField label={copy.zip} value={form.zipCode} onChange={(event) => setForm((current) => ({ ...current, zipCode: event.target.value }))} />
-                <InputField label={copy.allergies} value={form.allergies} onChange={(event) => setForm((current) => ({ ...current, allergies: event.target.value }))} placeholder="Penicillin, Peanuts" />
-                <InputField label={copy.emergencyName} value={form.emergencyName} onChange={(event) => setForm((current) => ({ ...current, emergencyName: event.target.value }))} />
-                <InputField label={copy.emergencyPhone} value={form.emergencyPhone} onChange={(event) => setForm((current) => ({ ...current, emergencyPhone: event.target.value }))} />
-                <InputField label={copy.emergencyRelation} value={form.emergencyRelationship} onChange={(event) => setForm((current) => ({ ...current, emergencyRelationship: event.target.value }))} />
-                <InputField label={copy.insuranceProvider} value={form.insuranceProvider} onChange={(event) => setForm((current) => ({ ...current, insuranceProvider: event.target.value }))} />
-                <InputField label={copy.policyNumber} value={form.insurancePolicyNumber} onChange={(event) => setForm((current) => ({ ...current, insurancePolicyNumber: event.target.value }))} />
+                <InputField
+                  label={copy.city}
+                  error={errors.city?.message}
+                  maxLength={50}
+                  {...register("city", {
+                    required: "City is required",
+                    maxLength: { value: 50, message: "City cannot exceed 50 characters" },
+                    validate: {
+                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "City must be at least 2 characters",
+                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "City can only contain letters and spaces",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.state}
+                  error={errors.state?.message}
+                  maxLength={50}
+                  {...register("state", {
+                    required: "State is required",
+                    maxLength: { value: 50, message: "State cannot exceed 50 characters" },
+                    validate: {
+                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "State must be at least 2 characters",
+                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "State can only contain letters and spaces",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.zip}
+                  error={errors.zipCode?.message}
+                  maxLength={6}
+                  onInput={(e) => {
+                    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
+                  }}
+                  {...register("zipCode", {
+                    required: "ZIP Code is required",
+                    maxLength: { value: 6, message: "ZIP Code must be exactly 6 digits" },
+                    pattern: {
+                      value: /^\d{6}$/,
+                      message: "ZIP Code must be exactly 6 digits",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.allergies}
+                  error={errors.allergies?.message}
+                  maxLength={200}
+                  placeholder="Penicillin, Peanuts"
+                  {...register("allergies", {
+                    maxLength: { value: 200, message: "Allergies cannot exceed 200 characters" },
+                    validate: (val) => !val || val.length <= 200 || "Allergies cannot exceed 200 characters",
+                  })}
+                />
+                <InputField
+                  label={copy.emergencyName}
+                  error={errors.emergencyName?.message}
+                  maxLength={100}
+                  {...register("emergencyName", {
+                    required: "Emergency Contact Name is required",
+                    maxLength: { value: 100, message: "Emergency Contact Name cannot exceed 100 characters" },
+                    validate: {
+                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "Emergency Contact Name must be at least 2 characters",
+                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "Emergency Contact Name can only contain letters and spaces",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.emergencyPhone}
+                  error={errors.emergencyPhone?.message}
+                  maxLength={10}
+                  onInput={(e) => {
+                    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                  }}
+                  {...register("emergencyPhone", {
+                    required: "Emergency Contact Phone is required",
+                    maxLength: { value: 10, message: "Emergency Contact Phone must be exactly 10 digits" },
+                    pattern: {
+                      value: /^[6-9]\d{9}$/,
+                      message: "Emergency Contact Phone must be a valid 10-digit number starting with 6, 7, 8, or 9",
+                    },
+                  })}
+                />
+                <InputField
+                  label={copy.emergencyRelation}
+                  error={errors.emergencyRelationship?.message}
+                  maxLength={50}
+                  {...register("emergencyRelationship", {
+                    maxLength: { value: 50, message: "Relationship cannot exceed 50 characters" },
+                  })}
+                />
+                <InputField
+                  label={copy.insuranceProvider}
+                  error={errors.insuranceProvider?.message}
+                  maxLength={100}
+                  {...register("insuranceProvider", {
+                    maxLength: { value: 100, message: "Insurance Provider cannot exceed 100 characters" },
+                  })}
+                />
+                <InputField
+                  label={copy.policyNumber}
+                  error={errors.insurancePolicyNumber?.message}
+                  maxLength={50}
+                  {...register("insurancePolicyNumber", {
+                    maxLength: { value: 50, message: "Policy Number cannot exceed 50 characters" },
+                  })}
+                />
               </div>
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? copy.creating : copy.register}
@@ -275,12 +499,12 @@ function PatientsPage() {
                         <p className="mt-2 text-sm text-[var(--text-muted)]">
                           {copy.patientId}:{" "}
                           <span className="font-mono tracking-wider text-[var(--text-dim)]">
-                            {supplement.patientCode || patient._id}
+                            {patient.patientId || supplement.patientCode || patient._id}
                           </span>
                           <button
                             type="button"
                             className="ml-2 text-xs text-[var(--teal)]"
-                            onClick={() => navigator.clipboard?.writeText(String(supplement.patientCode || patient._id))}
+                            onClick={() => navigator.clipboard?.writeText(String(patient.patientId || supplement.patientCode || patient._id))}
                           >
                             {copy.copy}
                           </button>

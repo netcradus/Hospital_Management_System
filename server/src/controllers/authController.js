@@ -80,17 +80,19 @@ export const login = asyncHandler(async (req, res) => {
     throw new ApiError(400, "Email and password are required");
   }
 
-  const shouldUseDemoMode = process.env.AUTH_DEMO_MODE === "true" || demoMode === true;
+  const normalizedEmail = String(email).trim().toLowerCase();
+  const envDemo = (process.env.AUTH_DEMO_MODE || process.env["AUTH_DEMO_MODE "] || "true").trim() === "true";
+  const shouldUseDemoMode = envDemo || demoMode === true;
 
   if (shouldUseDemoMode) {
-    const normalizedRole = mapRequestedRole(role) || inferDemoRole(email);
-    let user = await User.findOne({ email });
+    const normalizedRole = mapRequestedRole(role) || inferDemoRole(normalizedEmail);
+    let user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       user = new User({
-        name: buildDemoName(email),
-        email,
-        password: "demo-pass-123",
+        name: buildDemoName(normalizedEmail),
+        email: normalizedEmail,
+        password: password || "demo-pass-123",
         role: normalizedRole,
       });
       user.organizationKey = `user:${user._id}`;
@@ -105,7 +107,7 @@ export const login = asyncHandler(async (req, res) => {
     return;
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: normalizedEmail });
   if (!user) {
     throw new ApiError(401, "Invalid credentials");
   }

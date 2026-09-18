@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   HiOutlineArrowRightOnRectangle,
@@ -61,10 +61,21 @@ function DashboardLayout() {
         { to: "/admin/dashboard", label: t("nav.dashboard"), icon: HiOutlineHome },
         { to: "/admin/patients", label: t("nav.patients"), icon: HiOutlineUsers },
         { to: "/admin/doctors", label: t("nav.doctors"), icon: HiOutlineUserGroup },
+        { to: "/admin/staff", label: t("nav.staff"), icon: HiOutlineSquares2X2 },
+        { to: "/admin/departments", label: t("nav.departments"), icon: HiOutlineBuildingOffice2 },
         { to: "/admin/appointments", label: t("nav.appointments"), icon: HiOutlineCalendarDays },
         { to: "/admin/billing", label: t("nav.billing"), icon: HiOutlineCreditCard },
-        { to: "/admin/departments", label: t("nav.departments"), icon: HiOutlineBuildingOffice2 },
+        { to: "/admin/receptionist", label: "Receptionist", icon: HiOutlineUserGroup },
+      ],
+      admin: [
+        { to: "/admin/dashboard", label: t("nav.dashboard"), icon: HiOutlineHome },
+        { to: "/admin/patients", label: t("nav.patients"), icon: HiOutlineUsers },
+        { to: "/admin/doctors", label: t("nav.doctors"), icon: HiOutlineUserGroup },
         { to: "/admin/staff", label: t("nav.staff"), icon: HiOutlineSquares2X2 },
+        { to: "/admin/departments", label: t("nav.departments"), icon: HiOutlineBuildingOffice2 },
+        { to: "/admin/appointments", label: t("nav.appointments"), icon: HiOutlineCalendarDays },
+        { to: "/admin/billing", label: t("nav.billing"), icon: HiOutlineCreditCard },
+        { to: "/admin/receptionist", label: "Receptionist", icon: HiOutlineUserGroup },
       ],
       doctor: [
         { to: "/doctor/dashboard", label: t("nav.dashboard"), icon: HiOutlineHome },
@@ -130,7 +141,7 @@ function DashboardLayout() {
     if (item.to.includes("appointments")) return canAccess(role, "appointments", "view");
     if (item.to.includes("billing")) return canAccess(role, "billing", "view");
     if (item.to.includes("departments")) return canAccess(role, "departments", "view");
-    if (item.to.includes("staff")) return canAccess(role, "receptionist", "view");
+    if (item.to.includes("staff") || item.to.includes("receptionist")) return canAccess(role, "receptionist", "view");
     return true;
   });
   const roleLabel = getWorkspaceRoleLabel(role);

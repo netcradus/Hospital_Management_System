@@ -33,11 +33,74 @@ function DepartmentsManagementPage() {
   }, []);
 
   const fields = [
-    { name: "name", label: "Name", rules: { required: "Name is required" } },
-    { name: "description", label: "Description" },
-    { name: "headDoctor", label: "Head Doctor", type: "select", options: doctorOptions },
-    { name: "phone", label: "Phone" },
-    { name: "email", label: "Email" },
+    {
+      name: "name",
+      label: "Department Name",
+      maxLength: 100,
+      rules: {
+        required: "Department Name is required",
+        maxLength: { value: 100, message: "Department Name cannot exceed 100 characters" },
+        validate: {
+          noWhitespaceOnly: (val) => Boolean(val && val.trim().length > 0) || "Department Name is required",
+          minLength: (val) => !val || val.trim().length >= 2 || "Department Name must be at least 2 characters",
+          onlyAlphaSpace: (val) => !val || /^[A-Za-z\s]+$/.test(val.trim()) || "Department Name must contain only letters and spaces",
+        },
+      },
+    },
+    {
+      name: "description",
+      label: "Description",
+      type: "textarea",
+      maxLength: 500,
+      rules: {
+        maxLength: { value: 500, message: "Description cannot exceed 500 characters" },
+        validate: {
+          notWhitespaceOnly: (val) => {
+            if (!val || val.length === 0) return true;
+            return val.trim().length > 0 || "Description cannot contain only whitespace";
+          },
+        },
+      },
+    },
+    {
+      name: "headDoctor",
+      label: "Head Doctor",
+      type: "select",
+      options: doctorOptions,
+      rules: {},
+    },
+    {
+      name: "phone",
+      label: "Phone Number",
+      maxLength: 10,
+      onInput: (e) => {
+        e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+      },
+      rules: {
+        validate: {
+          tenDigitsIfProvided: (val) => {
+            if (!val || val.trim() === "") return true;
+            return /^[6-9]\d{9}$/.test(val.trim()) || "Please enter a valid 10-digit phone number";
+          },
+        },
+      },
+    },
+    {
+      name: "email",
+      label: "Email",
+      type: "email",
+      maxLength: 100,
+      rules: {
+        maxLength: { value: 100, message: "Email cannot exceed 100 characters" },
+        validate: {
+          validEmailIfProvided: (val) => {
+            if (!val || val.trim() === "") return true;
+            if (val.includes("..")) return "Please enter a valid email address";
+            return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(val.trim()) || "Please enter a valid email address";
+          },
+        },
+      },
+    },
   ];
 
   return (
@@ -48,7 +111,7 @@ function DepartmentsManagementPage() {
       resourceLabel="Department"
       fields={fields}
       columns={[
-        { key: "name", label: "Name" },
+        { key: "name", label: "Department Name" },
         { key: "description", label: "Description" },
         {
           key: "headDoctor",
@@ -60,7 +123,7 @@ function DepartmentsManagementPage() {
           searchValue: (row) => `${row.headDoctor?.firstName || ""} ${row.headDoctor?.lastName || ""}`.trim(),
           exportValue: (row) => `${row.headDoctor?.firstName || ""} ${row.headDoctor?.lastName || ""}`.trim(),
         },
-        { key: "phone", label: "Phone" },
+        { key: "phone", label: "Phone Number" },
         { key: "email", label: "Email" },
       ]}
       items={items}
@@ -73,11 +136,19 @@ function DepartmentsManagementPage() {
       layout="stacked"
       createPayload={(values) => ({
         ...values,
-        headDoctor: values.headDoctor || undefined,
+        name: values.name ? values.name.trim() : "",
+        description: values.description ? values.description.trim() : "",
+        headDoctor: values.headDoctor && values.headDoctor.trim() ? values.headDoctor.trim() : undefined,
+        phone: values.phone ? values.phone.trim() : "",
+        email: values.email ? values.email.trim() : "",
       })}
       editPayload={(item) => ({
         ...item,
-        headDoctor: item.headDoctor?._id || "",
+        name: item.name || "",
+        description: item.description || "",
+        headDoctor: item.headDoctor?._id || item.headDoctor || "",
+        phone: item.phone || "",
+        email: item.email || "",
       })}
     />
   );

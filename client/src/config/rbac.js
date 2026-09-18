@@ -1,9 +1,20 @@
 export const ROLE_PERMISSIONS = {
   super_admin: {
     dashboard: ["view"],
-    patients: ["view", "create", "edit", "delete", "assign", "approve"],
+    patients: ["view"],
     doctors: ["view", "create", "edit", "delete", "assign"],
-    appointments: ["view", "create", "edit", "delete", "approve"],
+    appointments: ["view"],
+    billing: ["view", "create", "edit", "delete", "approve", "download"],
+    departments: ["view", "create", "edit", "delete", "assign"],
+    receptionist: ["view", "create", "edit", "delete"],
+    prescriptions: ["view", "approve", "download"],
+    labTests: ["view", "create", "edit", "delete", "upload", "download"],
+  },
+  admin: {
+    dashboard: ["view"],
+    patients: ["view"],
+    doctors: ["view", "create", "edit", "delete", "assign"],
+    appointments: ["view"],
     billing: ["view", "create", "edit", "delete", "approve", "download"],
     departments: ["view", "create", "edit", "delete", "assign"],
     receptionist: ["view", "create", "edit", "delete"],

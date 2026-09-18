@@ -57,7 +57,7 @@ function buildSeedData(seed = {}) {
 
   return {
     patientCodes: patients.reduce((accumulator, patient, index) => {
-      accumulator[patient._id] = patient.patientCode || generatePatientId(patients.slice(0, index));
+      accumulator[patient._id] = patient.patientId || patient.patientCode || generatePatientId(patients.slice(0, index));
       return accumulator;
     }, {}),
     diagnoses: firstPatient && firstDoctor ? [
@@ -541,7 +541,7 @@ export function searchGrouped(query, context = {}) {
   }
 
   return {
-    patients: (context.patients || []).filter((item) => `${item.firstName} ${item.lastName} ${item._id}`.toLowerCase().includes(normalized)).slice(0, 5),
+    patients: (context.patients || []).filter((item) => `${item.firstName} ${item.lastName} ${item.patientId || ""} ${item._id}`.toLowerCase().includes(normalized)).slice(0, 5),
     doctors: (context.doctors || []).filter((item) => `${item.firstName} ${item.lastName} ${item.specialization}`.toLowerCase().includes(normalized)).slice(0, 5),
     appointments: (context.appointments || []).filter((item) => {
       const patientName = `${item.patientId?.firstName || ""} ${item.patientId?.lastName || ""}`;

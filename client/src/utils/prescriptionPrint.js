@@ -48,7 +48,7 @@ export function printPrescription({ hospital, doctor, patient, prescription, dia
           <div class="card">
             <h2>Patient Details</h2>
             <p><strong>${patient.name}</strong></p>
-            <p>Patient ID: ${patient.patientCode || patient.id || "-"}</p>
+            <p>Patient ID: ${patient.patientId || patient.patientCode || patient.id || "-"}</p>
             <p>Age/Gender: ${patient.age || "-"} / ${patient.gender || "-"}</p>
             <p>Date: ${formatDate(prescription.date)}</p>
           </div>

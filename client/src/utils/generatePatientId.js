@@ -1,15 +1,11 @@
 export function generatePatientId(existingPatients = []) {
-  const now = new Date();
-  const yy = String(now.getFullYear()).slice(-2);
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const prefix = `P-${yy}${mm}-`;
-
-  const thisMonthIds = existingPatients
+  const ids = existingPatients
     .map((p) => p?.patientId || p?.patientCode)
-    .filter((id) => id && id.startsWith(prefix))
-    .map((id) => Number.parseInt(id.replace(prefix, ""), 10))
+    .filter((id) => id && /^P\d+$/i.test(id))
+    .map((id) => Number.parseInt(id.replace(/^P/i, ""), 10))
     .filter((n) => Number.isFinite(n));
 
-  const nextNum = thisMonthIds.length > 0 ? Math.max(...thisMonthIds) + 1 : 1;
-  return `${prefix}${String(nextNum).padStart(3, "0")}`;
+  const nextNum = ids.length > 0 ? Math.max(...ids) + 1 : existingPatients.length + 1;
+  return `P${String(nextNum).padStart(3, "0")}`;
 }
+

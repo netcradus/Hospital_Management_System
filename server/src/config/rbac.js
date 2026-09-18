@@ -11,9 +11,20 @@ export const ROLES = {
 export const PERMISSIONS = {
   [ROLES.SUPER_ADMIN]: {
     dashboard: ["view", "approve", "download"],
-    patients: ["view", "create", "edit", "delete", "assign", "approve", "download"],
+    patients: ["view", "download"],
     doctors: ["view", "create", "edit", "delete", "assign"],
-    appointments: ["view", "create", "edit", "delete", "approve"],
+    appointments: ["view"],
+    billing: ["view", "create", "edit", "delete", "approve", "download"],
+    departments: ["view", "create", "edit", "delete", "assign"],
+    receptionist: ["view", "create", "edit", "delete", "assign"],
+    prescriptions: ["view", "approve", "download"],
+    labTests: ["view", "create", "edit", "delete", "assign", "approve", "upload", "download"],
+  },
+  [ROLES.ADMIN]: {
+    dashboard: ["view", "approve", "download"],
+    patients: ["view", "download"],
+    doctors: ["view", "create", "edit", "delete", "assign"],
+    appointments: ["view"],
     billing: ["view", "create", "edit", "delete", "approve", "download"],
     departments: ["view", "create", "edit", "delete", "assign"],
     receptionist: ["view", "create", "edit", "delete", "assign"],

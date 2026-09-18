@@ -22,6 +22,7 @@ const DoctorsPage = lazy(() => import("./pages/doctor/DoctorsPage"));
 const DoctorsManagementPage = lazy(() => import("./pages/admin/DoctorsManagementPage"));
 const AppointmentsPage = lazy(() => import("./pages/appointment/AppointmentsPage"));
 const BillingPage = lazy(() => import("./pages/billing/BillingPage"));
+const PatientBillingPage = lazy(() => import("./pages/billing/PatientBillingPage"));
 const DepartmentsPage = lazy(() => import("./pages/department/DepartmentsPage"));
 const DepartmentsManagementPage = lazy(() => import("./pages/admin/DepartmentsManagementPage"));
 const StaffPage = lazy(() => import("./pages/staff/StaffPage"));
@@ -130,7 +131,7 @@ function App() {
           <Route
             path="/admin/patients"
             element={
-              <ProtectedRoute allowedRoles={patientViewRoles}>
+              <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
                 <PatientsPage />
               </ProtectedRoute>
             }
@@ -138,7 +139,7 @@ function App() {
           <Route
             path="/doctor/patients"
             element={
-              <ProtectedRoute allowedRoles={patientViewRoles}>
+              <ProtectedRoute allowedRoles={["doctor"]}>
                 <PatientsPage />
               </ProtectedRoute>
             }
@@ -146,7 +147,7 @@ function App() {
           <Route
             path="/staff/patients"
             element={
-              <ProtectedRoute allowedRoles={patientViewRoles}>
+              <ProtectedRoute allowedRoles={["receptionist", "staff", "admin", "super_admin"]}>
                 <PatientsPage />
               </ProtectedRoute>
             }
@@ -154,7 +155,7 @@ function App() {
           <Route
             path="/admin/patients/:patientId"
             element={
-              <ProtectedRoute allowedRoles={patientViewRoles}>
+              <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
                 <PatientProfilePage />
               </ProtectedRoute>
             }
@@ -162,7 +163,7 @@ function App() {
           <Route
             path="/doctor/patients/:patientId"
             element={
-              <ProtectedRoute allowedRoles={patientViewRoles}>
+              <ProtectedRoute allowedRoles={["doctor"]}>
                 <PatientProfilePage />
               </ProtectedRoute>
             }
@@ -170,7 +171,7 @@ function App() {
           <Route
             path="/staff/patients/:patientId"
             element={
-              <ProtectedRoute allowedRoles={patientViewRoles}>
+              <ProtectedRoute allowedRoles={["receptionist", "staff", "admin", "super_admin"]}>
                 <PatientProfilePage />
               </ProtectedRoute>
             }
@@ -202,7 +203,7 @@ function App() {
           <Route
             path="/admin/appointments"
             element={
-              <ProtectedRoute allowedRoles={appointmentViewRoles}>
+              <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -210,7 +211,7 @@ function App() {
           <Route
             path="/doctor/appointments"
             element={
-              <ProtectedRoute allowedRoles={appointmentViewRoles}>
+              <ProtectedRoute allowedRoles={["doctor"]}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -218,7 +219,7 @@ function App() {
           <Route
             path="/patient/appointments"
             element={
-              <ProtectedRoute allowedRoles={appointmentViewRoles}>
+              <ProtectedRoute allowedRoles={["patient"]}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -226,7 +227,7 @@ function App() {
           <Route
             path="/staff/appointments"
             element={
-              <ProtectedRoute allowedRoles={appointmentViewRoles}>
+              <ProtectedRoute allowedRoles={["receptionist", "staff", "admin", "super_admin"]}>
                 <AppointmentsPage />
               </ProtectedRoute>
             }
@@ -234,7 +235,7 @@ function App() {
           <Route
             path="/admin/billing"
             element={
-              <ProtectedRoute allowedRoles={billingViewRoles}>
+              <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
                 <BillingPage />
               </ProtectedRoute>
             }
@@ -242,8 +243,8 @@ function App() {
           <Route
             path="/patient/billing"
             element={
-              <ProtectedRoute allowedRoles={billingViewRoles}>
-                <BillingPage />
+              <ProtectedRoute allowedRoles={["patient"]}>
+                <PatientBillingPage />
               </ProtectedRoute>
             }
           />
@@ -265,6 +266,14 @@ function App() {
           />
           <Route
             path="/admin/staff"
+            element={
+              <ProtectedRoute allowedRoles={receptionistViewRoles}>
+                <StaffPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/receptionist"
             element={
               <ProtectedRoute allowedRoles={receptionistViewRoles}>
                 <StaffPage />

@@ -4,7 +4,7 @@ const staffSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     firstName: { type: String, required: true },
-    lastName: { type: String, required: true },
+    lastName: { type: String, default: "" },
     role: { type: String, required: true },
     departmentId: { type: mongoose.Schema.Types.ObjectId, ref: "Department" },
     phone: String,
