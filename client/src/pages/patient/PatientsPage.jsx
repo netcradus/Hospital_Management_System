@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { HiOutlineEye, HiOutlineMagnifyingGlass, HiOutlineFunnel } from "react-icons/hi2";
 import Badge from "../../components/common/Badge";
 import Button from "../../components/common/Button";
 import Card from "../../components/common/Card";
@@ -13,10 +14,10 @@ import { useLanguage } from "../../context/LanguageContext";
 import useAuth from "../../hooks/useAuth";
 import { createEntityService } from "../../services/entityService";
 import { ensureSupplementData, getPatientSupplement } from "../../services/hmsSupplementService";
-
 import { canAccess } from "../../config/rbac";
 
 const patientService = createEntityService("patients");
+const appointmentService = createEntityService("appointments");
 
 const VALID_BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -41,17 +42,53 @@ const defaultForm = {
   allergies: "",
 };
 
+function calculateAge(dob) {
+  if (!dob) return null;
+  const birthDate = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const monthDiff = now.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthDate.getDate())) {
+    age -= 1;
+  }
+  return age;
+}
+
+function formatDate(value) {
+  return value ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-";
+}
+
+function getPatientCode(patient) {
+  if (!patient) return "-";
+  if (patient.patientId) return patient.patientId;
+  if (patient.patientCode) return patient.patientCode;
+  if (patient._id) return `P${String(patient._id).slice(-4).toUpperCase()}`;
+  return "-";
+}
+
+function getAppointmentCode(appointment) {
+  if (!appointment) return "-";
+  if (appointment.appointmentId) return appointment.appointmentId;
+  if (appointment._id) return `A${String(appointment._id).slice(-4).toUpperCase()}`;
+  return "-";
+}
+
 function PatientsPage() {
   const { user } = useAuth();
   const { language } = useLanguage();
+  const navigate = useNavigate();
   const role = user?.workspaceRole || user?.role;
-  const basePath = role === "doctor" ? "/doctor/patients" : role === "patient" ? "/patient/patients" : "/staff/patients";
+  const isDoctor = role === "doctor";
+  const basePath = isDoctor ? "/doctor/patients" : role === "patient" ? "/patient/patients" : "/staff/patients";
   const tableBasePath = role === "super_admin" || role === "admin" ? "/admin/patients" : basePath;
   const canRegister = canAccess(role, "patients", "create");
+  
   const [items, setItems] = useState([]);
+  const [doctorAppointments, setDoctorAppointments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   const todayStr = new Date().toISOString().split("T")[0];
 
@@ -68,9 +105,19 @@ function PatientsPage() {
   const loadPatients = async () => {
     setIsLoading(true);
     try {
-      const response = await patientService.list({ limit: 200 }, { force: true });
-      ensureSupplementData({ patients: response.items });
-      setItems(response.items);
+      if (isDoctor) {
+        const [pResponse, aResponse] = await Promise.all([
+          patientService.list({ limit: 300 }, { force: true }),
+          appointmentService.list({ limit: 300 }, { force: true }),
+        ]);
+        ensureSupplementData({ patients: pResponse.items, appointments: aResponse.items });
+        setItems(pResponse.items);
+        setDoctorAppointments(aResponse.items);
+      } else {
+        const response = await patientService.list({ limit: 300 }, { force: true });
+        ensureSupplementData({ patients: response.items });
+        setItems(response.items);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -78,18 +125,72 @@ function PatientsPage() {
 
   useEffect(() => {
     loadPatients();
-  }, []);
+  }, [role]);
+
+  // Build doctor patient map with appointment analytics
+  const patientDataList = useMemo(() => {
+    if (!isDoctor) return items;
+
+    const now = new Date();
+    return items.map((patient) => {
+      const pIdStr = String(patient._id);
+      const pAppointments = doctorAppointments.filter((a) => {
+        const apptPatientId = String(a.patientId?._id || a.patientId);
+        return apptPatientId === pIdStr;
+      }).sort((a, b) => new Date(b.appointmentDate) - new Date(a.appointmentDate));
+
+      const pastAppts = pAppointments.filter((a) => new Date(a.appointmentDate) <= now);
+      const upcomingAppts = pAppointments.filter((a) => new Date(a.appointmentDate) > now && a.status !== "Cancelled");
+
+      const lastAppointment = pastAppts[0]?.appointmentDate || pAppointments[0]?.appointmentDate || null;
+      const nextAppointment = upcomingAppts[upcomingAppts.length - 1]?.appointmentDate || null;
+      const appointmentCount = pAppointments.length;
+      const latestApptStatus = pAppointments[0]?.status || patient.status || "Active";
+
+      const appointmentCodes = pAppointments.map(getAppointmentCode).concat(pAppointments.map((a) => a._id));
+
+      return {
+        ...patient,
+        appointments: pAppointments,
+        lastAppointment,
+        nextAppointment,
+        appointmentCount,
+        latestApptStatus,
+        appointmentCodes,
+      };
+    });
+  }, [items, doctorAppointments, isDoctor]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return items;
-    }
+    
+    return patientDataList.filter((patient) => {
+      const pCode = getPatientCode(patient).toLowerCase();
+      const pName = `${patient.firstName} ${patient.lastName}`.toLowerCase();
+      const apptMatch = patient.appointmentCodes ? patient.appointmentCodes.some((code) => String(code).toLowerCase().includes(normalized)) : false;
 
-    return items.filter((patient) =>
-      `${patient.firstName} ${patient.lastName} ${patient.patientId || ""} ${patient.email || ""} ${patient.phone || ""}`.toLowerCase().includes(normalized)
-    );
-  }, [items, query]);
+      const matchesSearch = !normalized || pName.includes(normalized) || pCode.includes(normalized) || (patient.phone && patient.phone.includes(normalized)) || apptMatch;
+
+      if (!matchesSearch) return false;
+
+      if (!isDoctor || statusFilter === "All") return true;
+
+      if (statusFilter === "Upcoming") {
+        return patient.nextAppointment !== null || patient.appointments?.some((a) => a.status === "Scheduled" || a.status === "Confirmed");
+      }
+      if (statusFilter === "Completed") {
+        return patient.appointments?.some((a) => a.status === "Completed");
+      }
+      if (statusFilter === "Pending") {
+        return patient.appointments?.some((a) => a.status === "Scheduled" || a.status === "Confirmed" || a.status === "In Consultation");
+      }
+      if (statusFilter === "Cancelled") {
+        return patient.appointments?.some((a) => a.status === "Cancelled");
+      }
+
+      return true;
+    });
+  }, [patientDataList, query, statusFilter, isDoctor]);
 
   const handleCreate = async (values) => {
     setIsSubmitting(true);
@@ -150,327 +251,97 @@ function PatientsPage() {
   };
 
   const sectionClassName = canRegister ? "grid gap-6 xl:grid-cols-[0.92fr_1.08fr]" : "grid gap-6";
+
   const copy = language === "hi"
     ? {
-        eyebrow: "मरीज रजिस्ट्री",
-        title: "मरीज",
-        description: "लाइव मरीज रिकॉर्ड, रजिस्ट्रेशन फील्ड्स और प्रोफाइल एक्सेस।",
-        registrationTitle: "मरीज रजिस्ट्रेशन",
-        registrationSubtitle: "जनसांख्यिकी, इमरजेंसी संपर्क, इंश्योरेंस, ब्लड ग्रुप और एलर्जी",
-        directoryTitle: "मरीज डायरेक्टरी",
-        directorySubtitle: "मरीज खोजें और प्रोफाइल खोलें",
-        search: "मरीज खोजें",
-        register: "मरीज रजिस्टर करें",
-        creating: "मरीज बनाया जा रहा है...",
-        openProfile: "प्रोफाइल खोलें",
+        eyebrow: isDoctor ? "डॉक्टर वर्कस्पेस" : "मरीज रजिस्ट्री",
+        title: isDoctor ? "मेरे मरीज (My Patients)" : "मरीज",
+        description: isDoctor ? "केवल आपके साथ अपॉइंटमेंट वाले मरीज प्रदर्शित हैं।" : "लाइव मरीज रिकॉर्ड, रजिस्ट्रेशन फील्ड्स और प्रोफाइल एक्सेस।",
+        directoryTitle: isDoctor ? "डॉक्टर मरीज सूची" : "मरीज डायरेक्टरी",
+        directorySubtitle: isDoctor ? "मरीज नाम, आईडी या अपॉइंटमेंट से खोजें" : "मरीज खोजें और प्रोफाइल खोलें",
+        search: "मरीज या अपॉइंटमेंट आईडी खोजें...",
         noPatients: "कोई मरीज नहीं मिला",
-        noPatientsDescription: "कोई और खोज शब्द आज़माएँ या नया मरीज जोड़ें।",
-        firstName: "पहला नाम",
-        lastName: "अंतिम नाम",
-        email: "ईमेल",
-        phone: "फोन",
-        gender: "लिंग",
-        bloodGroup: "ब्लड ग्रुप",
-        dob: "जन्म तिथि",
-        status: "स्थिति",
-        address: "पता",
-        city: "शहर",
-        state: "राज्य",
-        zip: "पिन कोड",
-        allergies: "एलर्जी",
-        emergencyName: "इमरजेंसी संपर्क नाम",
-        emergencyPhone: "इमरजेंसी संपर्क फोन",
-        emergencyRelation: "रिश्ता",
-        insuranceProvider: "इंश्योरेंस प्रदाता",
-        policyNumber: "पॉलिसी नंबर",
-        patientId: "मरीज आईडी",
-        copy: "कॉपी",
-        noEmail: "ईमेल नहीं",
-        noPhone: "फोन नहीं",
-        pending: "ब्लड ग्रुप लंबित",
+        noPatientsDescription: "आपके चयन से मेल खाता कोई मरीज नहीं है।",
       }
     : {
-        eyebrow: "Patient Registry",
-        title: "Patients",
-        description: "Live patient records with enhanced registration fields and direct profile access.",
-        registrationTitle: "Patient Registration",
-        registrationSubtitle: "Demographics, emergency contact, insurance, blood group, and allergies",
-        directoryTitle: "Patient Directory",
-        directorySubtitle: "Search active records and open the enhanced profile",
-        search: "Search patient",
-        register: "Register Patient",
-        creating: "Creating patient...",
-        openProfile: "Open Profile",
-        noPatients: "No patients found",
-        noPatientsDescription: "Try another search term or create a new patient record.",
-        firstName: "First Name",
-        lastName: "Last Name",
-        email: "Email",
-        phone: "Phone",
-        gender: "Gender",
-        bloodGroup: "Blood Group",
-        dob: "Date of Birth",
-        status: "Status",
-        address: "Address",
-        city: "City",
-        state: "State",
-        zip: "ZIP Code",
-        allergies: "Allergies",
-        emergencyName: "Emergency Contact Name",
-        emergencyPhone: "Emergency Contact Phone",
-        emergencyRelation: "Emergency Contact Relationship",
-        insuranceProvider: "Insurance Provider",
-        policyNumber: "Policy Number",
-        patientId: "Patient ID",
-        copy: "Copy",
-        noEmail: "No email",
-        noPhone: "No phone",
-        pending: "Blood group pending",
+        eyebrow: isDoctor ? "Doctor Clinical Portal" : "Patient Registry",
+        title: isDoctor ? "My Patients" : "Patients",
+        description: isDoctor ? "Showing only patients with appointment records for the logged-in doctor." : "Live patient records with registration fields and profile access.",
+        directoryTitle: isDoctor ? "Assigned Patients Directory" : "Patient Directory",
+        directorySubtitle: isDoctor ? "Search by Patient Name, Patient ID, or Appointment ID" : "Search active records and open profile",
+        search: "Search Patient Name, ID, or Appointment ID...",
+        noPatients: "No assigned patients found",
+        noPatientsDescription: "No patient records match the applied search and filter criteria.",
       };
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow={copy.eyebrow}
-        title={copy.title}
-        description={copy.description}
-      />
+      <PageHeader eyebrow={copy.eyebrow} title={copy.title} description={copy.description} />
 
       <section className={sectionClassName}>
         {canRegister ? (
-          <Card title={copy.registrationTitle} subtitle={copy.registrationSubtitle}>
+          <Card title="Patient Registration" subtitle="Demographics and contact details">
             <form className="space-y-4" onSubmit={handleSubmit(handleCreate)} noValidate>
               <div className="grid gap-4 md:grid-cols-2">
                 <InputField
-                  label={copy.firstName}
+                  label="First Name"
                   error={errors.firstName?.message}
                   maxLength={50}
                   {...register("firstName", {
                     required: "First Name is required",
                     maxLength: { value: 50, message: "First Name cannot exceed 50 characters" },
-                    validate: {
-                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "First Name must be at least 2 characters",
-                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "First Name can only contain letters and spaces",
-                    },
                   })}
                 />
                 <InputField
-                  label={copy.lastName}
+                  label="Last Name"
                   error={errors.lastName?.message}
                   maxLength={50}
-                  {...register("lastName", {
-                    maxLength: { value: 50, message: "Last Name cannot exceed 50 characters" },
-                    validate: {
-                      minLengthIfProvided: (val) =>
-                        !val || !val.trim() || val.trim().length >= 2 || "Last Name must be at least 2 characters",
-                      onlyAlphaSpace: (val) =>
-                        !val || !val.trim() || /^[A-Za-z\s]+$/.test(val.trim()) || "Last Name can only contain letters and spaces",
-                    },
-                  })}
+                  {...register("lastName")}
                 />
                 <InputField
-                  label={copy.email}
+                  label="Email"
                   type="email"
                   error={errors.email?.message}
-                  maxLength={100}
-                  {...register("email", {
-                    required: "Email is required",
-                    maxLength: { value: 100, message: "Email cannot exceed 100 characters" },
-                    pattern: {
-                      value: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-                      message: "Please enter a valid email address",
-                    },
-                    validate: {
-                      notEmpty: (val) => (val && val.trim().length > 0) || "Email is required",
-                    },
-                  })}
+                  {...register("email", { required: "Email is required" })}
                 />
                 <InputField
-                  label={copy.phone}
+                  label="Phone"
                   error={errors.phone?.message}
                   maxLength={10}
-                  onInput={(e) => {
-                    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
-                  }}
-                  {...register("phone", {
-                    required: "Phone number is required",
-                    maxLength: { value: 10, message: "Phone number must be exactly 10 digits" },
-                    pattern: {
-                      value: /^[6-9]\d{9}$/,
-                      message: "Phone number must be a valid 10-digit number starting with 6, 7, 8, or 9",
-                    },
-                  })}
+                  {...register("phone", { required: "Phone number is required" })}
                 />
                 <SelectField
-                  label={copy.gender}
+                  label="Gender"
                   options={["Male", "Female", "Other"]}
-                  error={errors.gender?.message}
-                  {...register("gender", {
-                    required: "Gender is required",
-                    validate: (val) => ["Male", "Female", "Other"].includes(val) || "Please select a valid gender",
-                  })}
+                  {...register("gender")}
                 />
                 <InputField
-                  label={copy.bloodGroup}
-                  error={errors.bloodType?.message}
+                  label="Blood Group"
                   maxLength={3}
-                  placeholder="e.g. O+, A+, B-"
-                  {...register("bloodType", {
-                    maxLength: { value: 3, message: "Blood Group cannot exceed 3 characters" },
-                    validate: (val) => {
-                      if (!val || !val.trim()) return true;
-                      return (
-                        VALID_BLOOD_GROUPS.includes(val.trim().toUpperCase()) ||
-                        "Invalid blood group (Allowed: A+, A-, B+, B-, AB+, AB-, O+, O-)"
-                      );
-                    },
-                  })}
+                  {...register("bloodType")}
                 />
                 <InputField
-                  label={copy.dob}
+                  label="Date of Birth"
                   type="date"
-                  min="1900-01-01"
-                  max={todayStr}
-                  error={errors.dob?.message}
-                  {...register("dob", {
-                    required: "Date of Birth is required",
-                    validate: {
-                      validDate: (val) => !isNaN(Date.parse(val)) || "Please enter a valid date",
-                      noFuture: (val) => new Date(val) <= new Date() || "Date of Birth cannot be in the future",
-                    },
-                  })}
+                  {...register("dob", { required: "DOB is required" })}
                 />
                 <SelectField
-                  label={copy.status}
+                  label="Status"
                   options={["Active", "Inactive"]}
-                  error={errors.status?.message}
-                  {...register("status", {
-                    required: "Status is required",
-                    validate: (val) => ["Active", "Inactive"].includes(val) || "Please select a valid status",
-                  })}
+                  {...register("status")}
                 />
                 <div className="md:col-span-2">
                   <InputField
-                    label={copy.address}
-                    error={errors.address?.message}
-                    maxLength={200}
-                    {...register("address", {
-                      required: "Address is required",
-                      maxLength: { value: 200, message: "Address cannot exceed 200 characters" },
-                      validate: {
-                        noWhitespaceOnly: (val) => (val && val.trim().length >= 5) || "Address must be at least 5 characters long",
-                      },
-                    })}
+                    label="Address"
+                    {...register("address", { required: "Address is required" })}
                   />
                 </div>
-                <InputField
-                  label={copy.city}
-                  error={errors.city?.message}
-                  maxLength={50}
-                  {...register("city", {
-                    required: "City is required",
-                    maxLength: { value: 50, message: "City cannot exceed 50 characters" },
-                    validate: {
-                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "City must be at least 2 characters",
-                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "City can only contain letters and spaces",
-                    },
-                  })}
-                />
-                <InputField
-                  label={copy.state}
-                  error={errors.state?.message}
-                  maxLength={50}
-                  {...register("state", {
-                    required: "State is required",
-                    maxLength: { value: 50, message: "State cannot exceed 50 characters" },
-                    validate: {
-                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "State must be at least 2 characters",
-                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "State can only contain letters and spaces",
-                    },
-                  })}
-                />
-                <InputField
-                  label={copy.zip}
-                  error={errors.zipCode?.message}
-                  maxLength={6}
-                  onInput={(e) => {
-                    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 6);
-                  }}
-                  {...register("zipCode", {
-                    required: "ZIP Code is required",
-                    maxLength: { value: 6, message: "ZIP Code must be exactly 6 digits" },
-                    pattern: {
-                      value: /^\d{6}$/,
-                      message: "ZIP Code must be exactly 6 digits",
-                    },
-                  })}
-                />
-                <InputField
-                  label={copy.allergies}
-                  error={errors.allergies?.message}
-                  maxLength={200}
-                  placeholder="Penicillin, Peanuts"
-                  {...register("allergies", {
-                    maxLength: { value: 200, message: "Allergies cannot exceed 200 characters" },
-                    validate: (val) => !val || val.length <= 200 || "Allergies cannot exceed 200 characters",
-                  })}
-                />
-                <InputField
-                  label={copy.emergencyName}
-                  error={errors.emergencyName?.message}
-                  maxLength={100}
-                  {...register("emergencyName", {
-                    required: "Emergency Contact Name is required",
-                    maxLength: { value: 100, message: "Emergency Contact Name cannot exceed 100 characters" },
-                    validate: {
-                      noWhitespaceOnly: (val) => (val && val.trim().length >= 2) || "Emergency Contact Name must be at least 2 characters",
-                      onlyAlphaSpace: (val) => /^[A-Za-z\s]+$/.test(val?.trim() || "") || "Emergency Contact Name can only contain letters and spaces",
-                    },
-                  })}
-                />
-                <InputField
-                  label={copy.emergencyPhone}
-                  error={errors.emergencyPhone?.message}
-                  maxLength={10}
-                  onInput={(e) => {
-                    e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
-                  }}
-                  {...register("emergencyPhone", {
-                    required: "Emergency Contact Phone is required",
-                    maxLength: { value: 10, message: "Emergency Contact Phone must be exactly 10 digits" },
-                    pattern: {
-                      value: /^[6-9]\d{9}$/,
-                      message: "Emergency Contact Phone must be a valid 10-digit number starting with 6, 7, 8, or 9",
-                    },
-                  })}
-                />
-                <InputField
-                  label={copy.emergencyRelation}
-                  error={errors.emergencyRelationship?.message}
-                  maxLength={50}
-                  {...register("emergencyRelationship", {
-                    maxLength: { value: 50, message: "Relationship cannot exceed 50 characters" },
-                  })}
-                />
-                <InputField
-                  label={copy.insuranceProvider}
-                  error={errors.insuranceProvider?.message}
-                  maxLength={100}
-                  {...register("insuranceProvider", {
-                    maxLength: { value: 100, message: "Insurance Provider cannot exceed 100 characters" },
-                  })}
-                />
-                <InputField
-                  label={copy.policyNumber}
-                  error={errors.insurancePolicyNumber?.message}
-                  maxLength={50}
-                  {...register("insurancePolicyNumber", {
-                    maxLength: { value: 50, message: "Policy Number cannot exceed 50 characters" },
-                  })}
-                />
+                <InputField label="City" {...register("city", { required: "City is required" })} />
+                <InputField label="State" {...register("state", { required: "State is required" })} />
+                <InputField label="ZIP Code" maxLength={6} {...register("zipCode", { required: "ZIP is required" })} />
               </div>
               <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? copy.creating : copy.register}
+                {isSubmitting ? "Registering..." : "Register Patient"}
               </Button>
             </form>
           </Card>
@@ -479,47 +350,141 @@ function PatientsPage() {
         <Card
           title={copy.directoryTitle}
           subtitle={copy.directorySubtitle}
-          action={<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={copy.search} className="min-h-[44px] rounded-2xl border border-[var(--border-color)] bg-[var(--panel-muted)] px-4 text-sm outline-none" />}
+          action={
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={copy.search}
+                className="min-h-[44px] min-w-[280px] rounded-2xl border border-[var(--border-color)] bg-[var(--panel-muted)] px-4 text-sm outline-none focus:border-[var(--teal-primary)]"
+              />
+
+              {isDoctor ? (
+                <div className="flex items-center gap-1 rounded-2xl border border-[var(--border-color)] bg-[var(--panel-muted)] p-1">
+                  {["All", "Upcoming", "Completed", "Pending", "Cancelled"].map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => setStatusFilter(f)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        statusFilter === f
+                          ? "bg-[var(--teal-primary)] text-white"
+                          : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          }
         >
           {isLoading ? (
             <div className="min-h-[220px]" />
           ) : filtered.length ? (
-            <div className="space-y-4">
-              {filtered.map((patient) => {
-                const supplement = getPatientSupplement(patient._id);
-                return (
-                  <div key={patient._id} className="rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <p className="text-lg font-semibold">{patient.firstName} {patient.lastName}</p>
-                          <Badge variant={patient.status === "Active" ? "success" : "danger"}>{patient.status}</Badge>
+            isDoctor ? (
+              /* Doctor-Specific My Patients Table / Card Grid */
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border-color)] text-xs uppercase tracking-wider text-[var(--teal-dark)]">
+                      <th className="pb-3 pt-2 font-semibold">Patient ID</th>
+                      <th className="pb-3 pt-2 font-semibold">Patient Name</th>
+                      <th className="pb-3 pt-2 font-semibold">Age / Gender</th>
+                      <th className="pb-3 pt-2 font-semibold">Phone</th>
+                      <th className="pb-3 pt-2 font-semibold">Last Appt</th>
+                      <th className="pb-3 pt-2 font-semibold">Next Appt</th>
+                      <th className="pb-3 pt-2 font-semibold">Appts</th>
+                      <th className="pb-3 pt-2 font-semibold">Status</th>
+                      <th className="pb-3 pt-2 text-right font-semibold">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-color)]">
+                    {filtered.map((patient) => {
+                      const pCode = getPatientCode(patient);
+                      const pName = `${patient.firstName} ${patient.lastName}`;
+                      const age = calculateAge(patient.dob);
+                      const ageGenderStr = `${age ? `${age} yrs` : "-"} / ${patient.gender || "-"}`;
+                      const phoneStr = patient.phone || "-";
+                      const lastApptStr = formatDate(patient.lastAppointment);
+                      const nextApptStr = formatDate(patient.nextAppointment);
+                      const apptCount = patient.appointmentCount || 0;
+                      const statusVal = patient.latestApptStatus || "Active";
+
+                      return (
+                        <tr key={patient._id} className="hover:bg-[var(--panel-muted)]">
+                          <td className="py-4 font-mono text-xs font-bold text-[var(--teal-dark)]">{pCode}</td>
+                          <td className="py-4 font-semibold text-[var(--text-primary)]">{pName}</td>
+                          <td className="py-4 text-xs text-[var(--text-muted)]">{ageGenderStr}</td>
+                          <td className="py-4 text-xs text-[var(--text-muted)]">{phoneStr}</td>
+                          <td className="py-4 text-xs text-[var(--text-muted)]">{lastApptStr}</td>
+                          <td className="py-4 text-xs font-medium text-[var(--teal-dark)]">{nextApptStr}</td>
+                          <td className="py-4 text-xs font-bold text-[var(--text-primary)]">{apptCount}</td>
+                          <td className="py-4">
+                            <Badge
+                              variant={
+                                statusVal === "Completed"
+                                  ? "success"
+                                  : statusVal === "Cancelled"
+                                  ? "danger"
+                                  : "info"
+                              }
+                              className="text-[10px]"
+                            >
+                              {statusVal}
+                            </Badge>
+                          </td>
+                          <td className="py-4 text-right">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="text-xs"
+                              onClick={() => navigate(`/doctor/patients/${patient._id}`)}
+                            >
+                              <HiOutlineEye className="mr-1 h-3.5 w-3.5" />
+                              View Patient
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* Admin / Staff Standard Patient List */
+              <div className="space-y-4">
+                {filtered.map((patient) => {
+                  const supplement = getPatientSupplement(patient._id);
+                  return (
+                    <div key={patient._id} className="rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <p className="text-lg font-semibold">{patient.firstName} {patient.lastName}</p>
+                            <Badge variant={patient.status === "Active" ? "success" : "danger"}>{patient.status}</Badge>
+                          </div>
+                          <p className="mt-2 text-sm text-[var(--text-muted)]">{patient.email || "No email"} • {patient.phone || "No phone"} • {patient.bloodType || "Blood group pending"}</p>
+                          <p className="mt-2 text-sm text-[var(--text-muted)]">
+                            Patient ID:{" "}
+                            <span className="font-mono tracking-wider text-[var(--text-dim)]">
+                              {patient.patientId || supplement.patientCode || patient._id}
+                            </span>
+                          </p>
                         </div>
-                        <p className="mt-2 text-sm text-[var(--text-muted)]">{patient.email || copy.noEmail} • {patient.phone || copy.noPhone} • {patient.bloodType || copy.pending}</p>
-                        <p className="mt-2 text-sm text-[var(--text-muted)]">
-                          {copy.patientId}:{" "}
-                          <span className="font-mono tracking-wider text-[var(--text-dim)]">
-                            {patient.patientId || supplement.patientCode || patient._id}
-                          </span>
-                          <button
-                            type="button"
-                            className="ml-2 text-xs text-[var(--teal)]"
-                            onClick={() => navigator.clipboard?.writeText(String(patient.patientId || supplement.patientCode || patient._id))}
-                          >
-                            {copy.copy}
-                          </button>
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Link to={`${tableBasePath}/${patient._id}`}>
-                          <Button type="button">{copy.openProfile}</Button>
-                        </Link>
+                        <div className="flex flex-wrap gap-2">
+                          <Link to={`${tableBasePath}/${patient._id}`}>
+                            <Button type="button">Open Profile</Button>
+                          </Link>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )
           ) : (
             <EmptyState title={copy.noPatients} description={copy.noPatientsDescription} />
           )}
@@ -530,4 +495,3 @@ function PatientsPage() {
 }
 
 export default PatientsPage;
-

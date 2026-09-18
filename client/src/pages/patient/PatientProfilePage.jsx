@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { HiOutlineArrowDownTray, HiOutlineCalendarDays, HiOutlineChevronLeft, HiOutlineChevronRight, HiOutlinePlus } from "react-icons/hi2";
+import { useParams, useNavigate } from "react-router-dom";
+import {
+  HiOutlineArrowDownTray,
+  HiOutlineCalendarDays,
+  HiOutlineChevronLeft,
+  HiOutlineChevronRight,
+  HiOutlinePlus,
+  HiOutlinePrinter,
+  HiOutlineEye,
+  HiOutlineTrash,
+  HiOutlineClock,
+  HiOutlineDocumentText,
+  HiOutlineCheckCircle,
+} from "react-icons/hi2";
 import { toast } from "sonner";
 import Badge from "../../components/common/Badge";
 import Button from "../../components/common/Button";
@@ -33,10 +45,7 @@ const hospitalProfile = {
 };
 
 function calculateAge(dob) {
-  if (!dob) {
-    return null;
-  }
-
+  if (!dob) return null;
   const birthDate = new Date(dob);
   const now = new Date();
   let age = now.getFullYear() - birthDate.getFullYear();
@@ -51,82 +60,71 @@ function formatDate(value) {
   return value ? new Date(value).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-";
 }
 
-function buildCalendarDays(referenceDate) {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth();
-  const first = new Date(year, month, 1);
-  const startOffset = first.getDay();
-  const start = new Date(year, month, 1 - startOffset);
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const next = new Date(start);
-    next.setDate(start.getDate() + index);
-    return next;
-  });
+function getPatientCode(patient) {
+  if (!patient) return "-";
+  if (patient.patientId) return patient.patientId;
+  if (patient.patientCode) return patient.patientCode;
+  if (patient._id) return `P${String(patient._id).slice(-4).toUpperCase()}`;
+  return "-";
 }
 
-function severityVariant(value) {
-  return value === "Severe" ? "danger" : value === "Moderate" ? "warning" : "success";
+function getAppointmentCode(appointment) {
+  if (!appointment) return "-";
+  if (appointment.appointmentId) return appointment.appointmentId;
+  if (appointment._id) return `A${String(appointment._id).slice(-4).toUpperCase()}`;
+  return "-";
 }
 
-function statusVariant(value) {
-  if (["Active", "Completed", "Reviewed"].includes(value)) {
-    return "success";
-  }
-  if (["Pending", "Follow-up Required"].includes(value)) {
-    return "warning";
-  }
-  if (["Discontinued", "Inactive", "Urgent"].includes(value)) {
-    return "danger";
-  }
-  return "info";
-}
-
-function visitKind(appointment) {
-  const type = String(appointment.appointmentType || "").toLowerCase();
-  const reason = String(appointment.reasonForVisit || "").toLowerCase();
-  if (type.includes("emergency") || reason.includes("emergency")) {
-    return "emergency";
-  }
-  if (type.includes("follow") || reason.includes("follow")) {
-    return "follow-up";
-  }
-  return "routine";
-}
+const APPOINTMENT_STATUSES = ["Scheduled", "Confirmed", "In Consultation", "Completed", "Cancelled"];
 
 function PatientProfilePage() {
   const { patientId } = useParams();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const role = user?.workspaceRole || user?.role;
+  const isDoctor = role === "doctor";
+
   const [data, setData] = useState(null);
-  const [viewMode, setViewMode] = useState("calendar");
-  const [monthCursor, setMonthCursor] = useState(() => new Date());
-  const [selectedVisitKey, setSelectedVisitKey] = useState("");
+  const [updatingApptId, setUpdatingApptId] = useState(null);
+  
+  // Modals
   const [diagnosisModalOpen, setDiagnosisModalOpen] = useState(false);
+  const [createRxModalOpen, setCreateRxModalOpen] = useState(false);
+  const [viewRxModal, setViewRxModal] = useState(null);
   const [reportModal, setReportModal] = useState(null);
-  const [prescriptionPage, setPrescriptionPage] = useState(1);
+
+  // Diagnosis Form State
   const [diagnosisForm, setDiagnosisForm] = useState({
     diseaseName: "",
     icd10: "",
+    symptoms: "",
+    clinicalNotes: "",
+    treatmentRecommendation: "",
+    followUpInstructions: "",
     dateDiagnosed: new Date().toISOString().slice(0, 10),
     severity: "Mild",
     currentStatus: "Active",
-    doctorId: "",
-  });
-  const [noteForm, setNoteForm] = useState({
-    tag: "Observation",
-    diagnosisId: "",
     appointmentId: "",
-    content: "",
   });
-  const [showPrescriptionHint, setShowPrescriptionHint] = useState(false);
+
+  // Prescription Form State (Multi-Medicine)
+  const [rxForm, setRxForm] = useState({
+    appointmentId: "",
+    diagnosisId: "",
+    notes: "",
+    followUpDate: "",
+    medicines: [
+      { name: "Paracetamol 500mg", dose: "1 tablet", frequency: "Twice daily", duration: "5 days", instructions: "After food" },
+    ],
+  });
 
   const loadProfile = useCallback(async () => {
     const [patient, appointmentsResponse, doctorsResponse, patientsResponse, billingResponse] = await Promise.all([
       patientService.getById(patientId),
-      appointmentService.list({ limit: 200 }, { force: true }),
+      appointmentService.list({ limit: 300 }, { force: true }),
       doctorService.list({ limit: 100 }, { force: true }),
-      patientService.list({ limit: 200 }, { force: true }),
-      billingService.list({ limit: 200 }, { force: true }),
+      patientService.list({ limit: 300 }, { force: true }),
+      billingService.list({ limit: 300 }, { force: true }),
     ]);
 
     ensureSupplementData({
@@ -139,24 +137,26 @@ function PatientProfilePage() {
     const patientAppointments = appointmentsResponse.items
       .filter((item) => String(item.patientId?._id || item.patientId) === String(patientId))
       .sort((left, right) => new Date(right.appointmentDate) - new Date(left.appointmentDate));
+
     const supplement = getPatientSupplement(patientId);
 
-    setDiagnosisForm((current) => ({
-      ...current,
-      doctorId: current.doctorId || doctorsResponse.items[0]?._id || "",
-    }));
-    setNoteForm((current) => ({
-      ...current,
-      diagnosisId: current.diagnosisId || supplement.diagnoses[0]?.id || "",
-      appointmentId: current.appointmentId || patientAppointments[0]?._id || "",
-    }));
-    setSelectedVisitKey(patientAppointments[0]?.appointmentDate?.slice(0, 10) || "");
     setData({
       patient,
       doctors: doctorsResponse.items,
       appointments: patientAppointments,
       supplement,
     });
+
+    if (patientAppointments.length) {
+      setRxForm((prev) => ({
+        ...prev,
+        appointmentId: prev.appointmentId || patientAppointments[0]._id,
+      }));
+      setDiagnosisForm((prev) => ({
+        ...prev,
+        appointmentId: prev.appointmentId || patientAppointments[0]._id,
+      }));
+    }
   }, [patientId]);
 
   useEffect(() => {
@@ -166,60 +166,56 @@ function PatientProfilePage() {
     return () => window.removeEventListener("hms:supplement-updated", refresh);
   }, [loadProfile]);
 
+  const doctorLookup = useMemo(
+    () => new Map((data?.doctors || []).map((doc) => [doc._id, doc])),
+    [data?.doctors]
+  );
+  const diagnosisLookup = useMemo(
+    () => new Map((data?.supplement?.diagnoses || []).map((diag) => [diag.id, diag])),
+    [data?.supplement?.diagnoses]
+  );
+  const currentDoctorDoc = useMemo(
+    () => (data?.doctors || []).find((d) => String(d.userId || d._id) === String(user?._id || user?.id)) || (data?.doctors || [])[0],
+    [data?.doctors, user]
+  );
+
   const age = useMemo(() => calculateAge(data?.patient?.dob), [data?.patient?.dob]);
-  const visitsByDay = useMemo(() => {
-    return (data?.appointments || []).reduce((accumulator, appointment) => {
-      accumulator[new Date(appointment.appointmentDate).toISOString().slice(0, 10)] = appointment;
-      return accumulator;
-    }, {});
+
+  // Appointments split
+  const upcomingAppointments = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return (data?.appointments || []).filter(
+      (a) => new Date(a.appointmentDate) >= now && a.status !== "Completed" && a.status !== "Cancelled"
+    );
   }, [data?.appointments]);
-  const selectedVisit = selectedVisitKey ? visitsByDay[selectedVisitKey] : null;
-  const currentMonthDays = useMemo(() => buildCalendarDays(monthCursor), [monthCursor]);
-  const totalVisits = data?.appointments?.length || 0;
-  const lastVisit = data?.appointments?.find((item) => new Date(item.appointmentDate) <= new Date());
-  const nextVisit = [...(data?.appointments || [])].reverse().find((item) => new Date(item.appointmentDate) >= new Date());
-  const allPrescriptions = data?.supplement?.prescriptions || [];
-  const activePrescriptions = allPrescriptions.filter((item) => item.status === "Active");
-  const lastPrescription = allPrescriptions[0];
-  const prescriptionsPerPage = 10;
-  const totalPrescriptionPages = Math.max(1, Math.ceil(allPrescriptions.length / prescriptionsPerPage));
-  const paginatedPrescriptions = allPrescriptions.slice((prescriptionPage - 1) * prescriptionsPerPage, prescriptionPage * prescriptionsPerPage);
-  const canEditNotes = user?.role === "doctor" || user?.role === "super_admin";
-  const canUploadResult = user?.role === "lab_staff" || user?.role === "super_admin";
-  const canAddDiagnosis = user?.role === "doctor" || user?.role === "super_admin";
 
-  if (!data) {
-    return <div className="min-h-[40vh]" />;
-  }
+  const pastAppointments = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return (data?.appointments || []).filter(
+      (a) => new Date(a.appointmentDate) < now || a.status === "Completed" || a.status === "Cancelled"
+    );
+  }, [data?.appointments]);
 
-  const doctorLookup = new Map(data.doctors.map((doctor) => [doctor._id, doctor]));
-  const diagnosisLookup = new Map(data.supplement.diagnoses.map((diagnosis) => [diagnosis.id, diagnosis]));
-
-  const downloadPrescription = (prescription) => {
-    const doctor = doctorLookup.get(prescription.doctorId);
-    const diagnosis = diagnosisLookup.get(prescription.diagnosisId);
-    printPrescription({
-      hospital: hospitalProfile,
-      doctor: {
-        name: doctor ? `${doctor.firstName} ${doctor.lastName}` : "Doctor",
-        qualifications: doctor?.qualifications?.join(", "),
-        registrationNumber: doctor?.licenseNumber,
-        specialization: doctor?.specialization,
-      },
-      patient: {
-        name: `${data.patient.firstName} ${data.patient.lastName}`,
-        age,
-        gender: data.patient.gender,
-        patientCode: data.patient.patientId || data.supplement.patientCode || data.patient._id,
-      },
-      prescription,
-      diagnosis,
-    });
+  // Handle inline status update for doctor's appointments
+  const handleUpdateApptStatus = async (apptId, newStatus) => {
+    setUpdatingApptId(apptId);
+    try {
+      await appointmentService.update(apptId, { status: newStatus });
+      toast.success(`Appointment status updated to ${newStatus}`);
+      await loadProfile();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update appointment status");
+    } finally {
+      setUpdatingApptId(null);
+    }
   };
 
-  const submitDiagnosis = () => {
+  // Diagnosis Handlers
+  const handleAddDiagnosis = () => {
     if (!diagnosisForm.diseaseName.trim()) {
-      toast.error("Disease name is required");
+      toast.error("Disease name / diagnosis is required");
       return;
     }
 
@@ -227,527 +223,738 @@ function PatientProfilePage() {
       {
         ...diagnosisForm,
         patientId,
+        doctorId: currentDoctorDoc?._id,
         dateDiagnosed: new Date(diagnosisForm.dateDiagnosed).toISOString(),
       },
       user
     );
-    toast.success("Diagnosis added");
+
+    toast.success("Diagnosis record added");
     setDiagnosisModalOpen(false);
+    setDiagnosisForm({
+      diseaseName: "",
+      icd10: "",
+      symptoms: "",
+      clinicalNotes: "",
+      treatmentRecommendation: "",
+      followUpInstructions: "",
+      dateDiagnosed: new Date().toISOString().slice(0, 10),
+      severity: "Mild",
+      currentStatus: "Active",
+      appointmentId: data?.appointments[0]?._id || "",
+    });
   };
 
-  const submitNote = () => {
-    if (!noteForm.content.trim()) {
-      toast.error("Add note content first");
+  // Prescription Handlers (Multi-Medicine)
+  const handleAddMedicineRow = () => {
+    setRxForm((prev) => ({
+      ...prev,
+      medicines: [
+        ...prev.medicines,
+        { name: "", dose: "1 tablet", frequency: "Twice daily", duration: "5 days", instructions: "After food" },
+      ],
+    }));
+  };
+
+  const handleRemoveMedicineRow = (index) => {
+    setRxForm((prev) => ({
+      ...prev,
+      medicines: prev.medicines.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleMedicineChange = (index, field, value) => {
+    setRxForm((prev) => {
+      const updated = [...prev.medicines];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, medicines: updated };
+    });
+  };
+
+  const handleSavePrescription = (andPrint = false) => {
+    const validMedicines = rxForm.medicines.filter((m) => m.name.trim().length > 0);
+    if (!validMedicines.length) {
+      toast.error("Please add at least one medicine with a valid name.");
       return;
     }
 
-    saveDiagnosisNote(
-      {
-        ...noteForm,
-        patientId,
-        doctorId: data.doctors.find((doctor) => doctor.email?.toLowerCase() === user?.email?.toLowerCase())?._id || data.doctors[0]?._id,
-      },
-      user
-    );
-    toast.success("Diagnosis note saved");
-    setNoteForm((current) => ({ ...current, content: "" }));
+    const payload = {
+      patientId,
+      appointmentId: rxForm.appointmentId,
+      diagnosisId: rxForm.diagnosisId,
+      doctorId: currentDoctorDoc?._id,
+      status: "Active",
+      notes: rxForm.notes,
+      followUpDate: rxForm.followUpDate,
+      medicines: validMedicines,
+    };
+
+    const updatedData = savePrescription(payload, user);
+    toast.success("Prescription created successfully");
+    setCreateRxModalOpen(false);
+
+    if (andPrint) {
+      const latestRx = updatedData.prescriptions[0];
+      handlePrintPrescription(latestRx);
+    }
   };
 
-  const uploadResult = (test) => {
-    saveTestResult(
-      {
-        ...test,
-        status: "Completed",
-        resultValue: test.resultValue || "Result uploaded",
-        fileName: test.fileName || `${test.testName.toLowerCase().replace(/\s+/g, "-")}.pdf`,
+  const handlePrintPrescription = (prescription) => {
+    const doctor = doctorLookup.get(prescription.doctorId) || currentDoctorDoc;
+    const diagnosis = diagnosisLookup.get(prescription.diagnosisId);
+    
+    printPrescription({
+      hospital: hospitalProfile,
+      doctor: {
+        name: doctor ? `Dr. ${doctor.firstName} ${doctor.lastName}` : (user?.name || "Doctor"),
+        qualifications: doctor?.qualifications?.join(", ") || "MBBS, MD",
+        registrationNumber: doctor?.licenseNumber || doctor?.registrationNumber || "REG-DOC-1024",
+        specialization: doctor?.specialization || "General Medicine",
       },
-      user
-    );
-    toast.success("Test result updated");
+      patient: {
+        name: `${data.patient.firstName} ${data.patient.lastName}`,
+        age: age || "-",
+        gender: data.patient.gender || "-",
+        patientCode: getPatientCode(data.patient),
+      },
+      prescription,
+      diagnosis,
+    });
   };
+
+  // Timeline events generator
+  const timelineEvents = useMemo(() => {
+    if (!data) return [];
+
+    const events = [];
+
+    // Add Appointments
+    (data.appointments || []).forEach((appt) => {
+      events.push({
+        date: appt.appointmentDate,
+        title: `Appointment ${getAppointmentCode(appt)}`,
+        type: "appointment",
+        status: appt.status,
+        detail: `${appt.appointmentTime} • ${appt.reasonForVisit || "Consultation"}`,
+        raw: appt,
+      });
+    });
+
+    // Add Diagnoses
+    (data.supplement?.diagnoses || []).forEach((diag) => {
+      events.push({
+        date: diag.dateDiagnosed,
+        title: `Diagnosis Added: ${diag.diseaseName}`,
+        type: "diagnosis",
+        status: diag.currentStatus || "Active",
+        detail: `Severity: ${diag.severity} • ICD10: ${diag.icd10 || "-"}`,
+        raw: diag,
+      });
+    });
+
+    // Add Prescriptions
+    (data.supplement?.prescriptions || []).forEach((rx) => {
+      events.push({
+        date: rx.date,
+        title: `Prescription Issued (${rx.medicines?.length || 0} Medicines)`,
+        type: "prescription",
+        status: rx.status || "Active",
+        detail: rx.medicines?.map((m) => m.name).join(", ") || "Medication prescribed",
+        raw: rx,
+      });
+    });
+
+    return events.sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [data]);
+
+  if (!data) {
+    return <div className="min-h-[40vh]" />;
+  }
+
+  const patientCodeStr = getPatientCode(data.patient);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Patient Profile"
+        eyebrow="Clinical Patient Workspace"
         title={`${data.patient.firstName} ${data.patient.lastName}`}
-        description="Enhanced patient detail page with diagnoses, visits, prescriptions, notes, and tests."
+        description="Comprehensive patient profile, medical history, consultations, diagnosis, and digital prescriptions."
       />
 
+      {/* 1. Patient Information Header Card */}
       <Card>
         <div className="grid gap-6 lg:grid-cols-[auto_1fr_auto]">
-          <div className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-gradient-to-br from-[var(--teal)] to-[var(--blue)] text-3xl font-semibold text-white">
+          <div className="flex h-24 w-24 items-center justify-center rounded-[28px] bg-gradient-to-br from-[var(--teal-dark)] to-[var(--teal-primary)] text-3xl font-bold text-white shadow-md">
             {`${data.patient.firstName?.[0] || ""}${data.patient.lastName?.[0] || ""}`}
           </div>
+
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Full Name</p>
-              <p className="text-xl font-semibold">{`${data.patient.firstName} ${data.patient.lastName}`}</p>
-              <p className="text-sm text-[var(--text-muted)]">{age || "-"} years • {data.patient.gender || "-"} • {data.patient.bloodType || "-"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--teal-dark)]">Full Name & Demographics</p>
+              <p className="mt-1 text-xl font-bold text-[var(--text-primary)]">{`${data.patient.firstName} ${data.patient.lastName}`}</p>
+              <p className="text-sm text-[var(--text-muted)]">
+                {age ? `${age} yrs` : "Age unavailable"} • {data.patient.gender || "Unstated"} • Blood Group: <span className="font-semibold text-[var(--teal-dark)]">{data.patient.bloodType || "N/A"}</span>
+              </p>
             </div>
+
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Contact</p>
-              <p>{data.patient.phone || "-"}</p>
-              <p className="text-sm text-[var(--text-muted)]">{data.patient.email || "-"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--teal-dark)]">Contact Details</p>
+              <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{data.patient.phone || "No phone provided"}</p>
+              <p className="text-xs text-[var(--text-muted)]">{data.patient.email || "No email"}</p>
             </div>
+
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Address</p>
-              <p>{data.patient.address || [data.patient.city, data.patient.state, data.patient.zipCode].filter(Boolean).join(", ") || "-"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--teal-dark)]">Address</p>
+              <p className="mt-1 text-sm text-[var(--text-primary)]">
+                {data.patient.address || [data.patient.city, data.patient.state, data.patient.zipCode].filter(Boolean).join(", ") || "No address on record"}
+              </p>
             </div>
+
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Emergency Contact</p>
-              <p>{data.patient.emergencyContact?.name || "-"}</p>
-              <p className="text-sm text-[var(--text-muted)]">{data.patient.emergencyContact?.relationship || "-"} • {data.patient.emergencyContact?.phone || "-"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--teal-dark)]">Emergency Contact</p>
+              <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{data.patient.emergencyContact?.name || "-"}</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {data.patient.emergencyContact?.relationship || "Contact"} • {data.patient.emergencyContact?.phone || "-"}
+              </p>
             </div>
+
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Insurance</p>
-              <p>{data.patient.insurance?.provider || "-"}</p>
-              <p className="text-sm text-[var(--text-muted)]">Policy #{data.patient.insurance?.policyNumber || "-"}</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--teal-dark)]">Insurance Info</p>
+              <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">{data.patient.insurance?.provider || "None"}</p>
+              <p className="text-xs text-[var(--text-muted)]">Policy: {data.patient.insurance?.policyNumber || "-"}</p>
             </div>
+
             <div>
-              <p className="text-sm text-[var(--text-muted)]">Allergies</p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[var(--teal-dark)]">Allergies</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {(data.patient.allergies?.length ? data.patient.allergies : ["No known allergies"]).map((item) => (
-                  <span key={item} className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                  <span key={item} className="rounded-full bg-rose-100 px-3 py-0.5 text-xs font-semibold text-rose-700">
                     {item}
                   </span>
                 ))}
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-start gap-3">
-            <Badge variant={data.patient.status === "Active" ? "success" : "danger"}>{data.patient.status}</Badge>
-            <div className="rounded-[22px] bg-[var(--panel-muted)] px-4 py-3 text-sm text-[var(--text-muted)]">
-              Patient ID:{" "}
-              <span className="font-mono tracking-wider text-[var(--text-dim)]">{data.patient.patientId || data.supplement.patientCode || data.patient._id}</span>
-              <button
-                type="button"
-                className="ml-2 text-xs text-[var(--teal)]"
-                onClick={() => navigator.clipboard?.writeText(String(data.patient.patientId || data.supplement.patientCode || data.patient._id))}
-              >
-                Copy
-              </button>
+
+          <div className="flex flex-col items-start gap-3 border-t pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            <Badge variant={data.patient.status === "Active" ? "success" : "danger"}>{data.patient.status || "Active"}</Badge>
+            <div className="rounded-[18px] bg-[var(--panel-muted)] px-4 py-2 text-xs font-semibold text-[var(--text-muted)]">
+              Patient ID: <span className="font-mono text-sm text-[var(--teal-dark)]">{patientCodeStr}</span>
+            </div>
+            {isDoctor ? (
+              <Button type="button" className="w-full text-xs" onClick={() => setCreateRxModalOpen(true)}>
+                <HiOutlinePlus className="mr-1.5 text-sm" />
+                Create Prescription
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </Card>
+
+      {/* 2. Appointments Section (Upcoming & Past) */}
+      <Card title="Appointment History (With Currently Logged-in Doctor)" subtitle="Upcoming and past consultation appointments">
+        <div className="space-y-6">
+          {/* Upcoming Appointments */}
+          <div>
+            <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--teal-dark)]">Upcoming Appointments</h4>
+            <div className="mt-3 space-y-3">
+              {upcomingAppointments.length ? (
+                upcomingAppointments.map((appt) => (
+                  <div
+                    key={appt._id}
+                    className="flex flex-col gap-3 rounded-[20px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4 lg:flex-row lg:items-center lg:justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs font-bold text-[var(--teal-dark)]">{getAppointmentCode(appt)}</span>
+                        <p className="font-bold text-[var(--text-primary)]">{formatDate(appt.appointmentDate)} at {appt.appointmentTime}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Reason/Symptoms: <span className="font-medium text-[var(--text-primary)]">{appt.reasonForVisit || appt.symptoms || "Consultation"}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {isDoctor ? (
+                        <select
+                          value={appt.status}
+                          disabled={updatingApptId === appt._id}
+                          onChange={(e) => handleUpdateApptStatus(appt._id, e.target.value)}
+                          className="rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]"
+                        >
+                          {APPOINTMENT_STATUSES.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Badge variant={appt.status === "Completed" ? "success" : "info"}>{appt.status}</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">No upcoming appointments scheduled.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Past Appointments */}
+          <div>
+            <h4 className="text-sm font-bold uppercase tracking-wider text-[var(--teal-dark)]">Past Appointments</h4>
+            <div className="mt-3 space-y-3">
+              {pastAppointments.length ? (
+                pastAppointments.map((appt) => (
+                  <div
+                    key={appt._id}
+                    className="flex flex-col gap-3 rounded-[20px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4 lg:flex-row lg:items-center lg:justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs font-bold text-[var(--text-muted)]">{getAppointmentCode(appt)}</span>
+                        <p className="font-semibold text-[var(--text-primary)]">{formatDate(appt.appointmentDate)} at {appt.appointmentTime}</p>
+                      </div>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Reason/Symptoms: <span className="font-medium text-[var(--text-primary)]">{appt.reasonForVisit || appt.symptoms || "Consultation"}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      {isDoctor ? (
+                        <select
+                          value={appt.status}
+                          disabled={updatingApptId === appt._id}
+                          onChange={(e) => handleUpdateApptStatus(appt._id, e.target.value)}
+                          className="rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]"
+                        >
+                          {APPOINTMENT_STATUSES.map((st) => (
+                            <option key={st} value={st}>
+                              {st}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <Badge variant={appt.status === "Completed" ? "success" : appt.status === "Cancelled" ? "danger" : "info"}>
+                          {appt.status}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-[var(--text-muted)]">No past appointment history.</p>
+              )}
             </div>
           </div>
         </div>
       </Card>
 
-      <section className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+      {/* 3. Diagnosis & Medical History Section */}
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card
-          title="Disease & Diagnosis History"
-          subtitle="Timeline of diagnosed conditions"
+          title="Diagnoses & Clinical Conditions"
+          subtitle="Diagnosed diseases, ICD codes, and status"
           action={
-            canAddDiagnosis ? (
+            isDoctor ? (
               <Button type="button" onClick={() => setDiagnosisModalOpen(true)}>
-                <HiOutlinePlus className="mr-2 text-base" />
+                <HiOutlinePlus className="mr-1.5 text-base" />
                 Add Diagnosis
               </Button>
             ) : null
           }
         >
           <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-[var(--border-color)] text-left text-[var(--text-muted)]">
-                  <th className="py-3 pr-4">Disease</th>
-                  <th className="py-3 pr-4">ICD-10</th>
-                  <th className="py-3 pr-4">Date Diagnosed</th>
-                  <th className="py-3 pr-4">Severity</th>
-                  <th className="py-3 pr-4">Status</th>
-                  <th className="py-3">Doctor</th>
+                <tr className="border-b border-[var(--border-color)] text-xs uppercase text-[var(--teal-dark)]">
+                  <th className="pb-3 pt-2 font-semibold">Disease Name</th>
+                  <th className="pb-3 pt-2 font-semibold">ICD-10</th>
+                  <th className="pb-3 pt-2 font-semibold">Diagnosed Date</th>
+                  <th className="pb-3 pt-2 font-semibold">Severity</th>
+                  <th className="pb-3 pt-2 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody>
-                {data.supplement.diagnoses.length ? data.supplement.diagnoses.map((diagnosis) => {
-                  const doctor = doctorLookup.get(diagnosis.doctorId);
-                  return (
-                    <tr key={diagnosis.id} className="border-b border-[var(--border-color)]/70">
-                      <td className="py-3 pr-4 font-medium">{diagnosis.diseaseName}</td>
-                      <td className="py-3 pr-4">{diagnosis.icd10}</td>
-                      <td className="py-3 pr-4">{formatDate(diagnosis.dateDiagnosed)}</td>
-                      <td className="py-3 pr-4"><Badge variant={severityVariant(diagnosis.severity)}>{diagnosis.severity}</Badge></td>
-                      <td className="py-3 pr-4"><Badge variant={statusVariant(diagnosis.currentStatus)}>{diagnosis.currentStatus}</Badge></td>
-                      <td className="py-3">{doctor ? `${doctor.firstName} ${doctor.lastName}` : "-"}</td>
+              <tbody className="divide-y divide-[var(--border-color)]">
+                {(data.supplement?.diagnoses || []).length ? (
+                  data.supplement.diagnoses.map((diag) => (
+                    <tr key={diag.id}>
+                      <td className="py-3 font-semibold text-[var(--text-primary)]">{diag.diseaseName}</td>
+                      <td className="py-3 font-mono text-xs">{diag.icd10 || "-"}</td>
+                      <td className="py-3 text-xs text-[var(--text-muted)]">{formatDate(diag.dateDiagnosed)}</td>
+                      <td className="py-3">
+                        <Badge variant={diag.severity === "Severe" ? "danger" : diag.severity === "Moderate" ? "warning" : "success"}>
+                          {diag.severity}
+                        </Badge>
+                      </td>
+                      <td className="py-3">
+                        <Badge variant={diag.currentStatus === "Active" ? "info" : "success"}>{diag.currentStatus}</Badge>
+                      </td>
                     </tr>
-                  );
-                }) : (
-                  <tr><td className="py-4 text-[var(--text-muted)]" colSpan={6}>No diagnoses recorded yet.</td></tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="py-4 text-xs text-[var(--text-muted)]">
+                      No diagnosis records added yet.
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
         </Card>
 
-        <Card title="Visit Calendar" subtitle="2-year visit navigation and summary">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-[24px] bg-[var(--panel-muted)] p-4">
-              <p className="text-sm text-[var(--text-muted)]">Total Visits</p>
-              <p className="mt-2 text-2xl font-semibold">{totalVisits}</p>
-            </div>
-            <div className="rounded-[24px] bg-[var(--panel-muted)] p-4">
-              <p className="text-sm text-[var(--text-muted)]">Last Visit</p>
-              <p className="mt-2 text-base font-semibold">{formatDate(lastVisit?.appointmentDate)}</p>
-            </div>
-            <div className="rounded-[24px] bg-[var(--panel-muted)] p-4">
-              <p className="text-sm text-[var(--text-muted)]">Next Appointment</p>
-              <p className="mt-2 text-base font-semibold">{formatDate(nextVisit?.appointmentDate)}</p>
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="secondary" onClick={() => setMonthCursor((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))}>
-                <HiOutlineChevronLeft />
-              </Button>
-              <div className="rounded-[20px] bg-[var(--panel-muted)] px-4 py-2 font-semibold">
-                {monthCursor.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
-              </div>
-              <Button type="button" variant="secondary" onClick={() => setMonthCursor((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))}>
-                <HiOutlineChevronRight />
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" variant={viewMode === "calendar" ? "primary" : "secondary"} onClick={() => setViewMode("calendar")}>Calendar</Button>
-              <Button type="button" variant={viewMode === "list" ? "primary" : "secondary"} onClick={() => setViewMode("list")}>List</Button>
-            </div>
-          </div>
-
-          {viewMode === "calendar" ? (
-            <div className="mt-4">
-              <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-dim)]">
-                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => <span key={label}>{label}</span>)}
-              </div>
-              <div className="mt-3 grid grid-cols-7 gap-2">
-                {currentMonthDays.map((date) => {
-                  const key = date.toISOString().slice(0, 10);
-                  const visit = visitsByDay[key];
-                  const variant = visit ? visitKind(visit) : null;
-                  const dotClass = variant === "emergency" ? "bg-rose-500" : variant === "follow-up" ? "bg-amber-500" : variant ? "bg-emerald-500" : "";
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => visit && setSelectedVisitKey(key)}
-                      className={`min-h-[74px] rounded-[20px] border p-2 text-left transition ${date.getMonth() === monthCursor.getMonth() ? "" : "opacity-45"} ${visit ? "border-[rgba(26,188,156,0.24)] bg-[var(--panel-muted)]" : "border-[var(--border-color)] bg-[var(--panel-bg)]"} ${selectedVisitKey === key ? "ring-2 ring-[rgba(26,188,156,0.32)]" : ""}`}
-                    >
-                      <span className="text-sm font-semibold">{date.getDate()}</span>
-                      {visit ? <span className={`mt-4 block h-2.5 w-2.5 rounded-full ${dotClass}`} /> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-4 space-y-3">
-              {data.appointments.length ? data.appointments.map((appointment) => (
-                <button key={appointment._id} type="button" onClick={() => setSelectedVisitKey(appointment.appointmentDate.slice(0, 10))} className="w-full rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4 text-left">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="font-medium">{formatDate(appointment.appointmentDate)} • {appointment.appointmentTime}</p>
-                      <p className="mt-1 text-sm text-[var(--text-muted)]">{appointment.reasonForVisit || "Visit recorded"}</p>
-                    </div>
-                    <Badge variant={statusVariant(visitKind(appointment) === "emergency" ? "Urgent" : visitKind(appointment) === "follow-up" ? "Follow-up Required" : "Active")}>
-                      {visitKind(appointment)}
-                    </Badge>
-                  </div>
-                </button>
-              )) : <EmptyState title="No visits recorded" description="Visit history will appear here once appointments exist." />}
-            </div>
-          )}
-
-          <div className="mt-4 rounded-[24px] bg-[var(--panel-muted)] p-4">
-            {selectedVisit ? (
-              <>
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--teal-dark)]">
-                  <HiOutlineCalendarDays />
-                  Visit summary
+        {/* Patient Interactive Timeline */}
+        <Card title="Patient History Timeline" subtitle="Chronological clinical events">
+          <div className="relative space-y-4 border-l-2 border-[var(--teal-primary)] pl-4">
+            {timelineEvents.length ? (
+              timelineEvents.slice(0, 10).map((event, idx) => (
+                <div key={idx} className="relative">
+                  <div className="absolute -left-[21px] top-1.5 h-3 w-3 rounded-full bg-[var(--teal-primary)] ring-4 ring-[var(--panel-bg)]" />
+                  <p className="text-xs font-bold text-[var(--teal-dark)]">{formatDate(event.date)}</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">{event.title}</p>
+                  <p className="text-xs text-[var(--text-muted)]">{event.detail}</p>
                 </div>
-                <p className="mt-3 font-medium">{`${selectedVisit.doctorId?.firstName || ""} ${selectedVisit.doctorId?.lastName || ""}`.trim() || "Doctor unavailable"}</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{selectedVisit.reasonForVisit || "Visit reason not available"}</p>
-                <p className="mt-3 text-sm">Duration: {selectedVisit.duration || 30} min</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{selectedVisit.notes || "No visit notes recorded."}</p>
-              </>
+              ))
             ) : (
-              <p className="text-sm text-[var(--text-muted)]">Select a visit date to view the summary.</p>
+              <p className="text-xs text-[var(--text-muted)]">No timeline events recorded yet.</p>
             )}
           </div>
         </Card>
       </section>
 
+      {/* 4. Prescription History Section */}
       <Card
-        title="Prescriptions"
-        subtitle="Historical and active medication lists"
+        title="Prescription History"
+        subtitle="Digital prescriptions issued for this patient"
         action={
-          canEditNotes ? (
-            <Button type="button" variant="secondary" onClick={() => setShowPrescriptionHint(true)}>
-              Add Prescription
+          isDoctor ? (
+            <Button type="button" onClick={() => setCreateRxModalOpen(true)}>
+              <HiOutlinePlus className="mr-1.5 text-base" />
+              Create Prescription
             </Button>
           ) : null
         }
       >
-        {lastPrescription ? (
-          <div className="mb-5 rounded-[28px] bg-gradient-to-r from-[rgba(26,188,156,0.12)] to-[rgba(41,128,232,0.08)] p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--teal-dark)]">Last Prescription Note</p>
-                <p className="mt-3 text-lg font-semibold">{(diagnosisLookup.get(lastPrescription.diagnosisId)?.diseaseName) || "Recent prescription"}</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">{formatDate(lastPrescription.date)}</p>
-                <div className="mt-4 space-y-2 text-sm">
-                  {lastPrescription.medicines.map((medicine) => (
-                    <p key={`${lastPrescription.id}-${medicine.name}`}>{medicine.name} • {medicine.dose} • {medicine.frequency} • {medicine.duration}</p>
-                  ))}
+        <div className="space-y-4">
+          {(data.supplement?.prescriptions || []).length ? (
+            (data.supplement.prescriptions || []).map((rx) => {
+              const doctor = doctorLookup.get(rx.doctorId) || currentDoctorDoc;
+              const diag = diagnosisLookup.get(rx.diagnosisId);
+              const medCount = rx.medicines?.length || 0;
+
+              return (
+                <div
+                  key={rx.id}
+                  className="flex flex-col gap-4 rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-5 transition-all hover:border-[var(--teal-primary)] lg:flex-row lg:items-center lg:justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-mono text-xs font-bold text-[var(--teal-dark)]">Rx ID: {rx.id}</span>
+                      <p className="text-sm font-bold text-[var(--text-primary)]">Issued: {formatDate(rx.date)}</p>
+                      <Badge variant={rx.status === "Active" ? "success" : "info"}>{rx.status || "Active"}</Badge>
+                    </div>
+
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Doctor: <span className="font-semibold text-[var(--text-primary)]">{doctor ? `Dr. ${doctor.firstName} ${doctor.lastName}` : "Doctor"}</span> • Diagnosis: <span className="font-semibold text-[var(--text-primary)]">{diag?.diseaseName || "General Advice"}</span>
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {rx.medicines?.map((med, mIdx) => (
+                        <span key={mIdx} className="rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1 text-xs font-medium text-[var(--text-primary)]">
+                          {med.name} ({med.dose}) • {med.frequency}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-3 lg:border-l lg:border-[var(--border-color)] lg:pl-6 lg:pt-0">
+                    <Button type="button" variant="secondary" className="text-xs" onClick={() => setViewRxModal(rx)}>
+                      <HiOutlineEye className="mr-1.5 h-3.5 w-3.5" />
+                      View Details
+                    </Button>
+                    <Button type="button" className="text-xs" onClick={() => handlePrintPrescription(rx)}>
+                      <HiOutlinePrinter className="mr-1.5 h-3.5 w-3.5" />
+                      Print / Download
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <Button type="button" className="min-w-[220px]" onClick={() => downloadPrescription(lastPrescription)}>
-                <HiOutlineArrowDownTray className="mr-2 text-base" />
-                Download
-              </Button>
+              );
+            })
+          ) : (
+            <EmptyState title="No prescriptions created" description="Click Create Prescription to prescribe medicines for this patient." />
+          )}
+        </div>
+      </Card>
+
+      {/* MODAL 1: Add Diagnosis Modal */}
+      <Modal open={diagnosisModalOpen} onClose={() => setDiagnosisModalOpen(false)} title="Add Clinical Diagnosis" size="lg">
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <InputField
+              label="Disease / Diagnosis Name *"
+              placeholder="e.g. Type 2 Diabetes Mellitus"
+              value={diagnosisForm.diseaseName}
+              onChange={(e) => setDiagnosisForm((p) => ({ ...p, diseaseName: e.target.value }))}
+            />
+            <InputField
+              label="ICD-10 Code"
+              placeholder="e.g. E11.9"
+              value={diagnosisForm.icd10}
+              onChange={(e) => setDiagnosisForm((p) => ({ ...p, icd10: e.target.value }))}
+            />
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <InputField
+              label="Diagnosed Date"
+              type="date"
+              value={diagnosisForm.dateDiagnosed}
+              onChange={(e) => setDiagnosisForm((p) => ({ ...p, dateDiagnosed: e.target.value }))}
+            />
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase text-[var(--teal-dark)]">Severity</label>
+              <select
+                value={diagnosisForm.severity}
+                onChange={(e) => setDiagnosisForm((p) => ({ ...p, severity: e.target.value }))}
+                className="w-full rounded-2xl border border-[var(--border-color)] bg-[var(--surface-color)] p-3 text-sm"
+              >
+                <option value="Mild">Mild</option>
+                <option value="Moderate">Moderate</option>
+                <option value="Severe">Severe</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase text-[var(--teal-dark)]">Status</label>
+              <select
+                value={diagnosisForm.currentStatus}
+                onChange={(e) => setDiagnosisForm((p) => ({ ...p, currentStatus: e.target.value }))}
+                className="w-full rounded-2xl border border-[var(--border-color)] bg-[var(--surface-color)] p-3 text-sm"
+              >
+                <option value="Active">Active</option>
+                <option value="Resolved">Resolved</option>
+                <option value="Chronic">Chronic</option>
+              </select>
             </div>
           </div>
-        ) : null}
 
-        {activePrescriptions.length ? (
-          <div className="mb-5 rounded-[24px] border border-[rgba(26,188,156,0.22)] bg-[rgba(26,188,156,0.08)] p-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[var(--teal-dark)]">Current Active Prescriptions</p>
-            <div className="mt-3 flex flex-wrap gap-3">
-              {activePrescriptions.map((prescription) => (
-                <div key={prescription.id} className="rounded-full bg-white px-4 py-2 text-sm shadow-sm">
-                  {prescription.medicines.map((medicine) => medicine.name).join(", ")}
+          <InputField
+            label="Symptoms / Observations"
+            placeholder="Key symptoms observed during consultation..."
+            value={diagnosisForm.symptoms}
+            onChange={(e) => setDiagnosisForm((p) => ({ ...p, symptoms: e.target.value }))}
+          />
+          <InputField
+            label="Treatment Recommendation & Clinical Notes"
+            placeholder="Diagnostic recommendations, dietary guidelines, advice..."
+            value={diagnosisForm.treatmentRecommendation}
+            onChange={(e) => setDiagnosisForm((p) => ({ ...p, treatmentRecommendation: e.target.value }))}
+          />
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setDiagnosisModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleAddDiagnosis}>
+              Save Diagnosis
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL 2: Create Prescription Modal (Multi-Medicine) */}
+      <Modal open={createRxModalOpen} onClose={() => setCreateRxModalOpen(false)} title="Create Digital Prescription" size="xl">
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase text-[var(--teal-dark)]">Link Appointment</label>
+              <select
+                value={rxForm.appointmentId}
+                onChange={(e) => setRxForm((p) => ({ ...p, appointmentId: e.target.value }))}
+                className="w-full rounded-2xl border border-[var(--border-color)] bg-[var(--surface-color)] p-3 text-sm"
+              >
+                {(data.appointments || []).map((a) => (
+                  <option key={a._id} value={a._id}>
+                    {getAppointmentCode(a)} • {formatDate(a.appointmentDate)} ({a.appointmentTime})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase text-[var(--teal-dark)]">Link Diagnosis</label>
+              <select
+                value={rxForm.diagnosisId}
+                onChange={(e) => setRxForm((p) => ({ ...p, diagnosisId: e.target.value }))}
+                className="w-full rounded-2xl border border-[var(--border-color)] bg-[var(--surface-color)] p-3 text-sm"
+              >
+                <option value="">General Advice / No Specific Diagnosis</option>
+                {(data.supplement?.diagnoses || []).map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.diseaseName} ({d.severity})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Medicines Multi-Item Table */}
+          <div>
+            <div className="flex items-center justify-between pb-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)]">Medicines Prescribed</h4>
+              <Button type="button" variant="secondary" className="text-xs" onClick={handleAddMedicineRow}>
+                <HiOutlinePlus className="mr-1 h-3.5 w-3.5" />
+                Add Medicine
+              </Button>
+            </div>
+
+            <div className="space-y-3">
+              {rxForm.medicines.map((med, index) => (
+                <div key={index} className="grid gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--panel-muted)] p-3 sm:grid-cols-12 items-end">
+                  <div className="sm:col-span-4">
+                    <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Medicine Name & Strength *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Paracetamol 500mg"
+                      value={med.name}
+                      onChange={(e) => handleMedicineChange(index, "name", e.target.value)}
+                      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1.5 text-xs font-medium outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Dosage</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 1 tablet"
+                      value={med.dose}
+                      onChange={(e) => handleMedicineChange(index, "dose", e.target.value)}
+                      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1.5 text-xs outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Frequency</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Twice daily"
+                      value={med.frequency}
+                      onChange={(e) => handleMedicineChange(index, "frequency", e.target.value)}
+                      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1.5 text-xs outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Duration</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 5 days"
+                      value={med.duration}
+                      onChange={(e) => handleMedicineChange(index, "duration", e.target.value)}
+                      className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1.5 text-xs outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 flex items-center gap-1">
+                    <div className="flex-1">
+                      <label className="text-[10px] font-semibold uppercase text-[var(--text-muted)]">Instructions</label>
+                      <input
+                        type="text"
+                        placeholder="After food"
+                        value={med.instructions}
+                        onChange={(e) => handleMedicineChange(index, "instructions", e.target.value)}
+                        className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--surface-color)] px-3 py-1.5 text-xs outline-none"
+                      />
+                    </div>
+
+                    {rxForm.medicines.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedicineRow(index)}
+                        className="rounded-lg p-2 text-rose-500 hover:bg-rose-50"
+                      >
+                        <HiOutlineTrash className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
-        ) : null}
 
-        <div className="space-y-4">
-          {paginatedPrescriptions.length ? paginatedPrescriptions.map((prescription) => {
-            const doctor = doctorLookup.get(prescription.doctorId);
-            return (
-              <div key={prescription.id} className="rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <p className="font-semibold">{formatDate(prescription.date)}</p>
-                      <Badge variant={statusVariant(prescription.status)}>{prescription.status}</Badge>
-                    </div>
-                    <p className="mt-2 text-sm text-[var(--text-muted)]">{doctor ? `${doctor.firstName} ${doctor.lastName}` : "Doctor"} • {(diagnosisLookup.get(prescription.diagnosisId)?.diseaseName) || "Diagnosis pending"}</p>
-                    <div className="mt-4 grid gap-2 md:grid-cols-2">
-                      {prescription.medicines.map((medicine) => (
-                        <div key={`${prescription.id}-${medicine.name}`} className="rounded-[18px] bg-white/85 px-4 py-3 text-sm">
-                          <p className="font-medium">{medicine.name}</p>
-                          <p className="text-[var(--text-muted)]">{medicine.dose} • {medicine.frequency}</p>
-                          <p className="text-[var(--text-muted)]">{medicine.duration}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="mt-3 text-sm text-[var(--text-muted)]">{prescription.notes}</p>
-                  </div>
-                  <Button type="button" variant="secondary" onClick={() => downloadPrescription(prescription)}>
-                    <HiOutlineArrowDownTray className="mr-2 text-base" />
-                    Download Prescription
-                  </Button>
-                </div>
-              </div>
-            );
-          }) : <EmptyState title="No prescriptions yet" description="Prescription cards will appear here once medicines are recorded." />}
-        </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <InputField
+              label="Doctor Advice / Instructions"
+              placeholder="e.g. Rest, drink plenty of water, avoid spicy food..."
+              value={rxForm.notes}
+              onChange={(e) => setRxForm((p) => ({ ...p, notes: e.target.value }))}
+            />
+            <InputField
+              label="Follow-up Date"
+              type="date"
+              value={rxForm.followUpDate}
+              onChange={(e) => setRxForm((p) => ({ ...p, followUpDate: e.target.value }))}
+            />
+          </div>
 
-        <div className="mt-5 flex items-center justify-between">
-          <p className="text-sm text-[var(--text-muted)]">Page {prescriptionPage} of {totalPrescriptionPages}</p>
-          <div className="flex gap-2">
-            <Button type="button" variant="secondary" disabled={prescriptionPage === 1} onClick={() => setPrescriptionPage((value) => value - 1)}>Prev</Button>
-            <Button type="button" variant="secondary" disabled={prescriptionPage === totalPrescriptionPages} onClick={() => setPrescriptionPage((value) => value + 1)}>Next</Button>
+          <div className="flex flex-wrap justify-end gap-3 pt-3">
+            <Button type="button" variant="secondary" onClick={() => setCreateRxModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => handleSavePrescription(false)}>
+              Save Prescription
+            </Button>
+            <Button type="button" onClick={() => handleSavePrescription(true)}>
+              <HiOutlinePrinter className="mr-1.5 text-base" />
+              Save & Print Prescription
+            </Button>
           </div>
         </div>
-      </Card>
+      </Modal>
 
-      <section className="space-y-6">
-        <Card title="Diagnosis Notes" subtitle={canEditNotes ? "Doctors can add/edit notes. Patients can only read." : "Read-only notes"}>
-          {canEditNotes ? (
-            <div className="mb-4 rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <label className="text-sm">
-                  <span className="mb-2 block text-[var(--text-muted)]">Tag</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-white px-4" value={noteForm.tag} onChange={(event) => setNoteForm((current) => ({ ...current, tag: event.target.value }))}>
-                    {["Observation", "Follow-up Required", "Referred", "Urgent"].map((tag) => <option key={tag}>{tag}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm">
-                  <span className="mb-2 block text-[var(--text-muted)]">Diagnosis</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-white px-4" value={noteForm.diagnosisId} onChange={(event) => setNoteForm((current) => ({ ...current, diagnosisId: event.target.value }))}>
-                    {data.supplement.diagnoses.map((diagnosis) => <option key={diagnosis.id} value={diagnosis.id}>{diagnosis.diseaseName}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm">
-                  <span className="mb-2 block text-[var(--text-muted)]">Visit</span>
-                  <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-white px-4" value={noteForm.appointmentId} onChange={(event) => setNoteForm((current) => ({ ...current, appointmentId: event.target.value }))}>
-                    {data.appointments.map((appointment) => <option key={appointment._id} value={appointment._id}>{formatDate(appointment.appointmentDate)} • {appointment.reasonForVisit || "Visit"}</option>)}
-                  </select>
-                </label>
+      {/* MODAL 3: View Prescription Details Modal */}
+      <Modal open={Boolean(viewRxModal)} onClose={() => setViewRxModal(null)} title="Prescription Details" size="lg">
+        {viewRxModal ? (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <div>
+                <p className="text-xs text-[var(--text-muted)]">Prescription ID: <span className="font-mono font-bold text-[var(--teal-dark)]">{viewRxModal.id}</span></p>
+                <p className="text-sm font-semibold text-[var(--text-primary)]">Date: {formatDate(viewRxModal.date)}</p>
               </div>
-              <label className="mt-3 block text-sm">
-                <span className="mb-2 block text-[var(--text-muted)]">Rich text notes</span>
-                <textarea
-                  rows={5}
-                  className="w-full rounded-2xl border border-[var(--border-color)] bg-white px-4 py-3"
-                  value={noteForm.content}
-                  onChange={(event) => setNoteForm((current) => ({ ...current, content: event.target.value }))}
-                  placeholder="Write observations, follow-up instructions, or referral notes..."
-                />
-              </label>
-              <div className="mt-3 flex justify-end gap-3">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    if (!noteForm.appointmentId) {
-                      toast.error("Select a visit first");
-                      return;
-                    }
-                    savePrescription(
-                      {
-                        patientId,
-                        appointmentId: noteForm.appointmentId,
-                        diagnosisId: noteForm.diagnosisId,
-                        doctorId: data.doctors.find((doctor) => doctor.email?.toLowerCase() === user?.email?.toLowerCase())?._id || data.doctors[0]?._id,
-                        status: "Active",
-                        notes: noteForm.content || "Prescription note saved from diagnosis workspace.",
-                        medicines: [
-                          { name: "Review medication", dose: "As advised", frequency: "Daily", duration: "14 days", instructions: "See detailed notes" },
-                        ],
-                      },
-                      user
-                    );
-                    toast.success("Prescription draft added");
-                    setShowPrescriptionHint(false);
-                  }}
-                >
-                  Add Prescription
-                </Button>
-                <Button type="button" onClick={submitNote}>Save Note</Button>
+              <Badge variant="success">{viewRxModal.status || "Active"}</Badge>
+            </div>
+
+            <div>
+              <p className="text-xs font-semibold uppercase text-[var(--teal-dark)]">Prescribed Medicines</p>
+              <div className="mt-2 space-y-2">
+                {viewRxModal.medicines?.map((med, idx) => (
+                  <div key={idx} className="rounded-xl border border-[var(--border-color)] bg-[var(--panel-muted)] p-3 text-xs">
+                    <p className="font-bold text-[var(--text-primary)]">{med.name}</p>
+                    <p className="text-[var(--text-muted)]">Dose: {med.dose} • Frequency: {med.frequency} • Duration: {med.duration}</p>
+                    {med.instructions ? <p className="text-[var(--teal-dark)]">Instructions: {med.instructions}</p> : null}
+                  </div>
+                ))}
               </div>
             </div>
-          ) : null}
 
-          <div className="space-y-3">
-            {data.supplement.diagnosisNotes.length ? data.supplement.diagnosisNotes.map((note) => {
-              const doctor = doctorLookup.get(note.doctorId);
-              return (
-                <div key={note.id} className="rounded-[24px] border border-[var(--border-color)] bg-[var(--panel-muted)] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{doctor ? `${doctor.firstName} ${doctor.lastName}` : "Doctor"}</p>
-                      <p className="text-sm text-[var(--text-muted)]">{formatDate(note.timestamp)}</p>
-                    </div>
-                    <Badge variant={statusVariant(note.tag)}>{note.tag}</Badge>
-                  </div>
-                  <p className="mt-3 text-sm text-[var(--text-secondary)]">{note.content}</p>
-                </div>
-              );
-            }) : <EmptyState title="No diagnosis notes" description="Doctors can add notes here and patients can review them." />}
-          </div>
-        </Card>
+            {viewRxModal.notes ? (
+              <div>
+                <p className="text-xs font-semibold uppercase text-[var(--teal-dark)]">Doctor Advice / Notes</p>
+                <p className="mt-1 text-xs text-[var(--text-primary)]">{viewRxModal.notes}</p>
+              </div>
+            ) : null}
 
-        <Card title="Tests Conducted" subtitle="Lab reports and ordered tests">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border-color)] text-left text-[var(--text-muted)]">
-                  <th className="py-3 pr-4">Test Name</th>
-                  <th className="py-3 pr-4">Date</th>
-                  <th className="py-3 pr-4">Ordered By</th>
-                  <th className="py-3 pr-4">Lab / Department</th>
-                  <th className="py-3 pr-4">Result Status</th>
-                  <th className="py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.supplement.tests.length ? data.supplement.tests.map((test) => {
-                  const doctor = doctorLookup.get(test.doctorId);
-                  return (
-                    <tr key={test.id} className="border-b border-[var(--border-color)]/70">
-                      <td className="py-3 pr-4 font-medium">{test.testName}</td>
-                      <td className="py-3 pr-4">{formatDate(test.date)}</td>
-                      <td className="py-3 pr-4">{doctor ? `${doctor.firstName} ${doctor.lastName}` : "-"}</td>
-                      <td className="py-3 pr-4">{test.department}</td>
-                      <td className="py-3 pr-4"><Badge variant={statusVariant(test.status)}>{test.status}</Badge></td>
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-2">
-                          {canUploadResult ? <Button type="button" variant="secondary" onClick={() => uploadResult(test)}>Upload Result</Button> : null}
-                          <Button type="button" variant="secondary" onClick={() => setReportModal(test)}>View Report</Button>
-                          <Button type="button" variant="secondary" onClick={() => window.print()}>
-                            <HiOutlineArrowDownTray className="mr-2 text-base" />
-                            Download
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                }) : (
-                  <tr><td className="py-4 text-[var(--text-muted)]" colSpan={6}>No tests recorded yet.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </section>
-
-      <Modal open={diagnosisModalOpen} onClose={() => setDiagnosisModalOpen(false)} title="Add Diagnosis" description="Create a new diagnosis entry." size="md">
-        <div className="space-y-4">
-          <InputField label="Disease Name" value={diagnosisForm.diseaseName} onChange={(event) => setDiagnosisForm((current) => ({ ...current, diseaseName: event.target.value }))} />
-          <InputField label="ICD-10 Code" value={diagnosisForm.icd10} onChange={(event) => setDiagnosisForm((current) => ({ ...current, icd10: event.target.value }))} />
-          <InputField
-            label="Date Diagnosed"
-            type="date"
-            min="1920-01-01"
-            max={new Date().toISOString().split("T")[0]}
-            value={diagnosisForm.dateDiagnosed}
-            onChange={(event) => setDiagnosisForm((current) => ({ ...current, dateDiagnosed: event.target.value }))}
-          />
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="text-sm">
-              <span className="mb-2 block text-[var(--text-muted)]">Severity</span>
-              <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={diagnosisForm.severity} onChange={(event) => setDiagnosisForm((current) => ({ ...current, severity: event.target.value }))}>
-                {["Mild", "Moderate", "Severe"].map((value) => <option key={value}>{value}</option>)}
-              </select>
-            </label>
-            <label className="text-sm">
-              <span className="mb-2 block text-[var(--text-muted)]">Status</span>
-              <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={diagnosisForm.currentStatus} onChange={(event) => setDiagnosisForm((current) => ({ ...current, currentStatus: event.target.value }))}>
-                {["Active", "Resolved", "Chronic"].map((value) => <option key={value}>{value}</option>)}
-              </select>
-            </label>
-            <label className="text-sm">
-              <span className="mb-2 block text-[var(--text-muted)]">Doctor</span>
-              <select className="min-h-[48px] w-full rounded-2xl border border-[var(--border-color)] bg-[var(--panel-bg)] px-4" value={diagnosisForm.doctorId} onChange={(event) => setDiagnosisForm((current) => ({ ...current, doctorId: event.target.value }))}>
-                {data.doctors.map((doctor) => <option key={doctor._id} value={doctor._id}>{`${doctor.firstName} ${doctor.lastName}`}</option>)}
-              </select>
-            </label>
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="secondary" onClick={() => setDiagnosisModalOpen(false)}>Cancel</Button>
-            <Button type="button" onClick={submitDiagnosis}>Save Diagnosis</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={Boolean(reportModal)} onClose={() => setReportModal(null)} title={reportModal?.testName} description="Result preview" size="md">
-        {reportModal ? (
-          <div className="space-y-3 text-sm text-[var(--text-secondary)]">
-            <p><strong>Status:</strong> {reportModal.status}</p>
-            <p><strong>Result:</strong> {reportModal.resultValue || "No result uploaded yet"}</p>
-            <p><strong>File:</strong> {reportModal.fileName || "No file attached"}</p>
+            <div className="flex justify-end gap-3 pt-3">
+              <Button type="button" variant="secondary" onClick={() => setViewRxModal(null)}>
+                Close
+              </Button>
+              <Button type="button" onClick={() => handlePrintPrescription(viewRxModal)}>
+                <HiOutlinePrinter className="mr-1.5 h-4 w-4" />
+                Print / Download
+              </Button>
+            </div>
           </div>
         ) : null}
-      </Modal>
-
-      <Modal open={showPrescriptionHint} onClose={() => setShowPrescriptionHint(false)} title="Add Prescription" description="Use the diagnosis notes form to create a prescription draft.">
-        <div className="space-y-3 text-sm text-[var(--text-secondary)]">
-          <p>1. Select the diagnosis and visit in the Diagnosis Notes card.</p>
-          <p>2. Write the prescription or advice in the notes area.</p>
-          <p>3. Click <strong>Add Prescription</strong> to create the draft.</p>
-          <p>4. The new prescription will appear in the prescriptions section above and can be downloaded immediately.</p>
-        </div>
       </Modal>
     </div>
   );
